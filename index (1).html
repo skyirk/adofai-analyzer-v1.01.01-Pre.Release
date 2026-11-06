@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ADOFAI ANALYZER</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- 소개(인트로) 화면: 불과 얼음 두 행성이 타일 길을 도는 배경 + 스트로크 타이틀 + 스크롤 확장 + 별빛 테두리 버튼 -->
+  <section id="intro" class="intro" aria-labelledby="intro-title" tabindex="-1">
+    <canvas id="intro-canvas" aria-hidden="true"></canvas>
+    <div class="intro-shade" aria-hidden="true"></div>
+    <div class="intro-scroll">
+      <div class="intro-hero">
+        <p class="intro-eyebrow">얼음과 불의 춤 · 커스텀 레벨 분석기</p>
+        <h1 id="intro-title" class="intro-title" aria-label="ADOFAI ANALYZER">
+          <svg class="stroke-text" viewBox="0 0 800 280" role="presentation" aria-hidden="true" focusable="false">
+            <defs>
+              <linearGradient id="g-fx" gradientUnits="userSpaceOnUse" x1="20" y1="0" x2="780" y2="0">
+                <stop offset="0" stop-color="#ff6a3d" /><stop offset=".32" stop-color="#ffbe5a" />
+                <stop offset=".7" stop-color="#46c8ff" /><stop offset="1" stop-color="#8caaff" />
+              </linearGradient>
+              <linearGradient id="g-top" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="130">
+                <stop offset="0" stop-color="#ffffff" /><stop offset="1" stop-color="#d8c4ff" />
+              </linearGradient>
+            </defs>
+            <text class="st st-a" x="400" y="118" text-anchor="middle" textLength="560" lengthAdjust="spacingAndGlyphs">ADOFAI</text>
+            <text class="st st-b" x="400" y="256" text-anchor="middle" textLength="760" lengthAdjust="spacingAndGlyphs">ANALYZER</text>
+          </svg>
+        </h1>
+        <p class="intro-lead">난이도 · 키 수 · 패턴으로 TUF 레벨을 골라 보세요.<br />내 손에 맞는 다음 맵이 이 길 위에 있습니다.</p>
+        <ul class="intro-stats">
+          <li><b id="intro-count">–</b><span>수록 맵</span></li>
+          <li><b>U1–U20</b><span>난이도 단위</span></li>
+          <li><b id="intro-patterns">8</b><span>패턴 필터</span></li>
+        </ul>
+        <button class="star-btn" id="intro-start" data-intro-go type="button"><span class="star-label">레벨 탐색</span><canvas class="star-canvas" aria-hidden="true"></canvas></button>
+        <p class="intro-hint">Enter 또는 Esc 로 바로 시작 · 아래로 스크롤하면 소개가 이어집니다</p>
+        <span class="intro-cue" aria-hidden="true">SCROLL</span>
+      </div>
+
+      <div class="intro-expand" id="intro-expand">
+        <div class="expand-sticky">
+          <div class="expand-frame" id="expand-frame">
+            <div class="expand-bg" aria-hidden="true">
+              <svg class="expand-orbit" viewBox="-200 -200 400 400" focusable="false">
+                <circle r="150" fill="none" stroke="rgba(213,155,255,.28)" stroke-width="1.2" />
+                <circle r="92" fill="none" stroke="rgba(213,155,255,.16)" stroke-width="1" stroke-dasharray="3 9" />
+                <g class="spin"><circle cx="150" cy="0" r="9" fill="#ff8a4d" /><circle cx="-150" cy="0" r="9" fill="#58c9ff" /></g>
+              </svg>
+            </div>
+            <div class="expand-label" id="expand-label">SCROLL</div>
+            <div class="expand-copy">
+              <p class="ex ex-1" id="ex-1">기존 포럼의 경계를 깨다</p>
+              <p class="ex ex-2" id="ex-2">더 세밀해지고 쉬워진 <span>TUF</span>사용</p>
+              <button class="star-btn ex-cta" id="ex-cta" data-intro-go type="button"><span class="star-label">레벨 탐색</span><canvas class="star-canvas" aria-hidden="true"></canvas></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <header class="topbar">
+    <div class="brand" id="brand" role="button" tabindex="0" title="소개 화면 보기">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".5"/>
+        <circle cx="16" cy="16" r="2" fill="currentColor"/>
+        <circle cx="25" cy="16" r="3.4" fill="#d59bff"/>
+        <circle cx="7" cy="16" r="3.4" fill="#7a4cc0"/>
+      </svg>
+      <span class="word">ADOFAI <em>ANALYZER</em></span>
+    </div>
+    <nav class="nav">
+      <button class="btn" id="btn-recommend">맵 추천</button>
+      <button class="btn" id="btn-saved">저장한 맵</button>
+      <a class="btn ghost" id="link-tuf" target="_blank" rel="noopener">tuforums.com</a>
+      <a class="btn ghost" id="link-levels" target="_blank" rel="noopener">ADOFAI 레벨 포럼</a>
+    </nav>
+    <div class="auth">
+      <span id="user-label" class="user-label hidden"></span>
+      <button class="btn" id="btn-login">로그인</button>
+      <button class="btn primary" id="btn-signup">회원가입</button>
+      <button class="btn ghost hidden" id="btn-logout">로그아웃</button>
+      <button class="btn ghost" id="btn-close">닫기</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- 필터 패널 -->
+    <aside class="panel" id="filters">
+      <h2>레벨 추천기</h2>
+
+      <section class="group">
+        <h3>난이도 단위</h3>
+        <div class="segmented" id="unit-select">
+          <button class="seg active" data-unit="PGU">PGU</button>
+          <button class="seg" data-unit="LEGACY">레거시 (1 ~ 21.3+)</button>
+        </div>
+      </section>
+
+      <section class="group">
+        <h3>난이도 범위 <span class="range-label" id="range-label"></span></h3>
+        <div class="dual-range">
+          <div class="track"><div class="fill" id="range-fill"></div></div>
+          <input type="range" id="range-min" min="0" max="59" value="0" />
+          <input type="range" id="range-max" min="0" max="59" value="59" />
+        </div>
+      </section>
+
+      <section class="group">
+        <h3>선호 키 개수 <span class="range-label" id="keys-label">제한 없음</span></h3>
+        <div class="segmented" id="keymode">
+          <button class="seg" type="button" data-kmode="normal">일반</button>
+          <button class="seg" type="button" data-kmode="limit">제한</button>
+        </div>
+        <p class="hint">제한: 정해진 키 수까지만 쓰도록 만든 맵. 둘 다 안 고르면 전체입니다.</p>
+        <div class="dots" id="key-dots"></div>
+        <button class="link-btn" id="keys-reset">초기화</button>
+      </section>
+
+      <section class="group">
+        <h3>패턴</h3>
+        <div class="chips" id="pattern-chips"></div>
+        <div class="row">
+          <label class="check"><input type="radio" name="pmode" value="or" checked /> 하나라도 포함</label>
+          <label class="check"><input type="radio" name="pmode" value="and" /> 모두 포함</label>
+        </div>
+        <label class="check"><input type="checkbox" id="ref-only" /> 포럼 기준 맵만 보기</label>
+      </section>
+
+      <button class="btn block" id="filters-reset">필터 초기화</button>
+    </aside>
+
+    <!-- 결과 목록 -->
+    <section class="results">
+      <div class="results-head">
+        <h2 id="results-title">추천 레벨 목록</h2>
+        <span id="results-count" class="count"></span>
+      </div>
+      <div id="level-list" class="level-list"></div>
+    </section>
+  </main>
+
+  <!-- 상세 모달 -->
+  <div class="modal hidden" id="modal-detail">
+    <div class="modal-card wide">
+      <button class="modal-x" data-close>✕</button>
+      <div id="detail-body"></div>
+    </div>
+  </div>
+
+  <!-- 로그인 모달 -->
+  <div class="modal hidden" id="modal-login">
+    <form class="modal-card" id="form-login" autocomplete="off">
+      <button type="button" class="modal-x" data-close>✕</button>
+      <h2>로그인</h2>
+      <label>ID<input id="login-id" type="text" required /></label>
+      <label>비밀번호<input id="login-pw" type="password" required /></label>
+      <p class="msg" id="login-msg"></p>
+      <button class="btn primary block" type="submit">로그인</button>
+    </form>
+  </div>
+
+  <!-- 회원가입 모달 -->
+  <div class="modal hidden" id="modal-signup">
+    <form class="modal-card" id="form-signup" autocomplete="off">
+      <button type="button" class="modal-x" data-close>✕</button>
+      <h2>회원가입</h2>
+      <label>ID <small>영문·숫자·특수문자, 8자리 이상</small>
+        <input id="su-id" type="text" required />
+      </label>
+      <p class="msg" id="su-id-msg"></p>
+      <label>비밀번호 <small>영문·숫자·특수기호 필수, 최소 7자리</small>
+        <input id="su-pw" type="password" required />
+      </label>
+      <p class="msg" id="su-pw-msg"></p>
+      <label>닉네임 <small>자유 입력</small>
+        <input id="su-nick" type="text" required maxlength="30" />
+      </label>
+      <p class="msg" id="su-nick-msg"></p>
+      <button class="btn primary block" type="submit">가입하기</button>
+    </form>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
