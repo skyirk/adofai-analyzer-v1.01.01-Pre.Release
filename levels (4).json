@@ -1,0 +1,1225 @@
+[
+  {
+    "id": "tuf-5",
+    "name": "Hello (BPM) 2021",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U4",
+    "legacy": "21.0+",
+    "keys": null,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "체력"
+    ],
+    "reference": true,
+    "refFor": "체력",
+    "desc": "TUF 체력 기준 맵. 채보: Nephrolepis, 2seehyun. BPM, 키 수는 확인되지 않아 비워 두었습니다.",
+    "tufId": 5,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-8054",
+    "name": "Chaos-Rybdis",
+    "creator": "Se-U-Ra",
+    "pgu": "U9",
+    "legacy": "21.2",
+    "keys": 10,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "개박"
+    ],
+    "reference": false,
+    "desc": "채보: 韓狼, SomSom 외 1명.",
+    "tufId": 8054,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-10797",
+    "name": "777 (Camellia's \"7,777cc\" Remix) (Nerfed | Judgement Limit)",
+    "creator": "RoughSketch & Camellia (かめりあ)",
+    "pgu": "U14",
+    "legacy": "21.3",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "질주"
+    ],
+    "reference": false,
+    "desc": "채보: Asansis, VL 외 8명.",
+    "tufId": 10797,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-10851",
+    "name": "ΩΩPARTS 『101%pure』",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U14",
+    "legacy": "21.3",
+    "keys": 10,
+    "keyLimit": true,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "동타"
+    ],
+    "reference": false,
+    "desc": "채보: 한가지.",
+    "tufId": 10851,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-5376",
+    "name": "HALL",
+    "creator": "Frums",
+    "pgu": "U16",
+    "legacy": "21.3+",
+    "keys": 10,
+    "keyLimit": true,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "개박",
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: 한가지.",
+    "tufId": 5376,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-11372",
+    "name": "QuomodocunquizE 『CROWN』",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U16",
+    "legacy": "21.3+",
+    "keys": 16,
+    "keyLimit": true,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "동타",
+      "질주"
+    ],
+    "reference": false,
+    "desc": "채보: Asansis.",
+    "tufId": 11372,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-13276",
+    "name": "orphᴉc",
+    "creator": "roər",
+    "pgu": "U15",
+    "legacy": "21.3+",
+    "keys": 16,
+    "keyLimit": true,
+    "bpm": null,
+    "patterns": [
+      "동타",
+      "체력",
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: Wishtimes.",
+    "tufId": 13276,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-263",
+    "name": "Camellia(かめりあ) 230+BPM 100ksub special mix [1hr]",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U15",
+    "legacy": "21.3+",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": "230+",
+    "patterns": [
+      "질주",
+      "체력"
+    ],
+    "reference": false,
+    "desc": "1시간짜리 스페셜 믹스. 채보: PLORALD 외 7명, Bori 외 5명.",
+    "tufId": 263,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-10730",
+    "name": "24-Dimensional Non-Euclidean Deep Blue Starfall Vertigo",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U13",
+    "legacy": "21.3",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "개박",
+      "질주"
+    ],
+    "reference": false,
+    "desc": "채보: 알파, VL 외 1명.",
+    "tufId": 10730,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-13816",
+    "name": "XNOR XNOR XNOR",
+    "creator": "Frums",
+    "pgu": "U15",
+    "legacy": "21.3+",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "개박",
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: harim.",
+    "tufId": 13816,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-11753",
+    "name": "Once Forgotten, Nothing Remains ~Chronos~",
+    "creator": "Raphiiel",
+    "pgu": "U15",
+    "legacy": "21.3+",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: Reiz, Aki.",
+    "tufId": 11753,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-11003",
+    "name": "Atohs",
+    "creator": "Ice",
+    "pgu": "U15",
+    "legacy": "21.3+",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: 한가지 외 1명.",
+    "tufId": 11003,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-7815",
+    "name": "Hello (BPM) 2025",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U15",
+    "legacy": "21.3+",
+    "keys": 10,
+    "keyLimit": true,
+    "bpm": null,
+    "patterns": [
+      "기믹",
+      "판정제한",
+      "체력"
+    ],
+    "reference": false,
+    "desc": "기믹은 판정 제한. 채보: 한가지.",
+    "tufId": 7815,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-7805",
+    "name": "Hello (BPM) 2025",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U14",
+    "legacy": "21.3",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "체력"
+    ],
+    "reference": false,
+    "desc": "채보: Nephrolepis, YOON 외 3명. (TUF 7815번과 이름이 같은 다른 채보)",
+    "tufId": 7805,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-9788",
+    "name": "Mare Tranquillitatis (\"Tenebras Lunae\" Long Ver.)",
+    "creator": "Cinamoro",
+    "pgu": "U15",
+    "legacy": "21.3+",
+    "keys": 12,
+    "keyLimit": true,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "복합"
+    ],
+    "reference": false,
+    "desc": "채보: Tr1.",
+    "tufId": 9788,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-9647",
+    "name": "SOURCE_MISSING",
+    "creator": "Sydosys",
+    "pgu": "U15",
+    "legacy": "21.3+",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "체력"
+    ],
+    "reference": false,
+    "desc": "채보: BAmethyst 외 1명.",
+    "tufId": 9647,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-3924",
+    "name": "Jipper EX",
+    "creator": "zsry",
+    "pgu": "U14",
+    "legacy": "21.3",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "체력"
+    ],
+    "reference": false,
+    "desc": "채보: Jongyeol 외 여러 명.",
+    "tufId": 3924,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-10708",
+    "name": "Grabinschrift der Götter 「Transcendence」",
+    "creator": "ikaruga_nex & 影虎。",
+    "pgu": "U13",
+    "legacy": "21.3",
+    "keys": 14,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주"
+    ],
+    "reference": false,
+    "desc": "채보: Reiz, 韓狼 외 1명.",
+    "tufId": 10708,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-10452",
+    "name": "REFLECTION»«REFRACTION",
+    "creator": "trung-nova",
+    "pgu": "U13",
+    "legacy": "21.3",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "체력"
+    ],
+    "reference": false,
+    "desc": "채보: 韓狼.",
+    "tufId": 10452,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-6206",
+    "name": "Little Rabbit and Deliverance (10K) (Judgement Limit)",
+    "creator": "Cinamoro",
+    "pgu": "U13",
+    "legacy": "21.3",
+    "keys": 10,
+    "keyLimit": true,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "질주",
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: 한가지.",
+    "tufId": 6206,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-6067",
+    "name": "ultra-blazures",
+    "creator": "Frums",
+    "pgu": "U13",
+    "legacy": "21.3",
+    "keys": 10,
+    "keyLimit": true,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: Nephy.",
+    "tufId": 6067,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-13976",
+    "name": "Chimera Dragons",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U13",
+    "legacy": "21.3",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "기믹",
+      "복합"
+    ],
+    "reference": false,
+    "desc": "채보: 채우한, Becl_ 외 2명.",
+    "tufId": 13976,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-2467",
+    "name": "Parallel Universe Shifter",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U13",
+    "legacy": "21.3",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "복합",
+      "질주",
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: 한가지, 고서양 외 8명.",
+    "tufId": 2467,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-111",
+    "name": "goTe EX",
+    "creator": "Frums",
+    "pgu": "U13",
+    "legacy": "21.3",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "개박",
+      "체력"
+    ],
+    "reference": false,
+    "desc": "채보: Asansis.",
+    "tufId": 111,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-12733",
+    "name": "Blossom of Ashes",
+    "creator": "Ludicin",
+    "pgu": "U12",
+    "legacy": "21.2+",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "복합",
+      "질주"
+    ],
+    "reference": false,
+    "desc": "채보: hallunacy 외 1명.",
+    "tufId": 12733,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-7093",
+    "name": "Rafflesia",
+    "creator": "Gardens",
+    "pgu": "U12",
+    "legacy": "21.2+",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "개박",
+      "질주"
+    ],
+    "reference": false,
+    "desc": "채보: harim 외 5명, 바선생 외 4명.",
+    "tufId": 7093,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-3303",
+    "name": "swallow SMOKE",
+    "creator": "Frums",
+    "pgu": "U13",
+    "legacy": "21.3",
+    "keys": 10,
+    "keyLimit": true,
+    "bpm": null,
+    "patterns": [
+      "복합",
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: 한가지.",
+    "tufId": 3303,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-6968",
+    "name": "REX",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U12",
+    "legacy": "21.2+",
+    "keys": 10,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "동타",
+      "체력",
+      "복합",
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: 한가지.",
+    "tufId": 6968,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-6",
+    "name": "Qyoh (Nine Stars)",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U5",
+    "legacy": "21.1",
+    "keys": 12,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "복합"
+    ],
+    "reference": false,
+    "desc": "채보: Nephrolepis, 송진우.",
+    "tufId": 6,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-2257",
+    "name": "Onus Rēgulus",
+    "creator": "Ludicin",
+    "pgu": "U12",
+    "legacy": "21.2+",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "질주"
+    ],
+    "reference": false,
+    "desc": "채보: Wishtimes.",
+    "tufId": 2257,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-87",
+    "name": "[ns]",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U11",
+    "legacy": "21.2+",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "복합"
+    ],
+    "reference": false,
+    "desc": "채보: 한가지.",
+    "tufId": 87,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-7684",
+    "name": "Operation: Zenithfall",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U12",
+    "legacy": "21.2+",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "질주",
+      "복합"
+    ],
+    "reference": false,
+    "desc": "채보: Nephrolepis, YOON 외 1명.",
+    "tufId": 7684,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-8974",
+    "name": "The Yandere&#39;s Puppet Show (renewal &amp; not normal hold)",
+    "creator": "acid-Notation",
+    "pgu": "U14",
+    "legacy": "21.3",
+    "keys": 12,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: 한가지 on The Universal Forums.",
+    "tufId": 8974,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-3569",
+    "name": "Hello (BPM) 2024",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U14",
+    "legacy": "21.3",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "질주",
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: 알파, 응애 &amp; 3 more on The Universal Forums.",
+    "tufId": 3569,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-3531",
+    "name": "PIONEER PROGRAM",
+    "creator": "II-L",
+    "pgu": "U14",
+    "legacy": "21.3",
+    "keys": 12,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "복합"
+    ],
+    "reference": false,
+    "desc": "채보: OMCard on The Universal Forums.",
+    "tufId": 3531,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-12250",
+    "name": "CCMJV Original / Auros",
+    "creator": "AisE &amp; Coal &amp; Eraser &amp; KreScent &amp; Lesitia. &amp; Lineyear &amp; OverNote&#39; &amp; Riya &amp; seatrus &amp; zsry &amp; FUT3R &amp; ORTAL &amp; Keyboard &amp; whiteroses",
+    "pgu": "U13",
+    "legacy": "21.3",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: Femboy &amp; 10 more, SomSom &amp; 25 more on The Universal Forums.",
+    "tufId": 12250,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-11688",
+    "name": "MAXIMUM BURST (feat. QURELESS)",
+    "creator": "HyuN",
+    "pgu": "U13",
+    "legacy": "21.3",
+    "keys": 10,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "기믹",
+      "체력"
+    ],
+    "reference": false,
+    "desc": "채보: Sutthe, Sutthe on The Universal Forums.",
+    "tufId": 11688,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-9537",
+    "name": "Elon Trust",
+    "creator": "Extra Terra &amp; Max Brhon",
+    "pgu": "U13",
+    "legacy": "21.3",
+    "keys": 17,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "체력"
+    ],
+    "reference": false,
+    "desc": "채보: w_yeah on The Universal Forums.",
+    "tufId": 9537,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-11564",
+    "name": "Fractal Vertex",
+    "creator": "Aoi &amp; kanemiko &amp; Kyutatsuki",
+    "pgu": "U14",
+    "legacy": "21.3",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "체력",
+      "복합"
+    ],
+    "reference": false,
+    "desc": "채보: harim on The Universal Forums.",
+    "tufId": 11564,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-1059",
+    "name": "MEGALOVANIA (Camellia Remix) (ex)",
+    "creator": "Toby Fox &amp; Camellia (かめりあ)",
+    "pgu": "U12",
+    "legacy": "21.2+",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "체력"
+    ],
+    "reference": false,
+    "desc": "채보: 알파, Irin on The Universal Forums.",
+    "tufId": 1059,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-12473",
+    "name": "CosmøgraphY (No Judgement Limit)",
+    "creator": "celtix",
+    "pgu": "U11",
+    "legacy": "21.2+",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: Fax on The Universal Forums.",
+    "tufId": 12473,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-7696",
+    "name": "Operation: Zenithfall (10K)",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U11",
+    "legacy": "21.2+",
+    "keys": 10,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "복합"
+    ],
+    "reference": false,
+    "desc": "채보: Nephrolepis on The Universal Forums.",
+    "tufId": 7696,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-6066",
+    "name": "Parallel Universe Shifter",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U11",
+    "legacy": "21.2+",
+    "keys": 12,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "복합",
+      "질주"
+    ],
+    "reference": false,
+    "desc": "채보: Nephy, Editor AlriC &amp; 6 more on The Universal Forums.",
+    "tufId": 6066,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-5353",
+    "name": "()",
+    "creator": "seatrus",
+    "pgu": "U11",
+    "legacy": "21.2+",
+    "keys": 17,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "복합"
+    ],
+    "reference": false,
+    "desc": "채보: 729, Speaker on The Universal Forums.",
+    "tufId": 5353,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-2177",
+    "name": "Parodia Sonatina -Grande- (ex)",
+    "creator": "Ice",
+    "pgu": "U11",
+    "legacy": "21.2+",
+    "keys": 12,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: Irin, yldo &amp; 2 more on The Universal Forums.",
+    "tufId": 2177,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-1069",
+    "name": "Hello (BPM) 2023",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U11",
+    "legacy": "21.2+",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "질주"
+    ],
+    "reference": false,
+    "desc": "채보: Nephrolepis, Irin &amp; 3 more on The Universal Forums.",
+    "tufId": 1069,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-16938",
+    "name": "Black Knife (nerdexample remix) SHADOW MANTLE",
+    "creator": "Toby Fox &amp; Loco",
+    "pgu": "U16",
+    "legacy": "21.3+",
+    "keys": 10,
+    "keyLimit": true,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "질주",
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: 한가지, Irin &amp; 1 more on The Universal Forums.",
+    "tufId": 16938,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-109",
+    "name": "We Want To Run",
+    "creator": "Frums",
+    "pgu": "U11",
+    "legacy": "21.2+",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "체력",
+      "복합"
+    ],
+    "reference": false,
+    "desc": "채보: Nephrolepis, Asansis on The Universal Forums.",
+    "tufId": 109,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-1537",
+    "name": "TremENDouS 『TheEND』",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U11",
+    "legacy": "21.2+",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "복합"
+    ],
+    "reference": false,
+    "desc": "채보: 한가지 on The Universal Forums.",
+    "tufId": 1537,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-823",
+    "name": "《/nttld.:beings》 ~Truth in Uncertainty~",
+    "creator": "GTS Sound Team",
+    "pgu": "U11",
+    "legacy": "21.2+",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "복합",
+      "개박"
+    ],
+    "reference": false,
+    "desc": "채보: Nephrolepis on The Universal Forums.",
+    "tufId": 823,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-448",
+    "name": "UMBRA, RADIOLOGOS.",
+    "creator": "Frums",
+    "pgu": "U11",
+    "legacy": "21.2+",
+    "keys": 12,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "복합",
+      "개박",
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: SurberHD on The Universal Forums.",
+    "tufId": 448,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-9118",
+    "name": "Echoes of Memoria",
+    "creator": "Ludicin",
+    "pgu": "U14",
+    "legacy": "21.3",
+    "keys": 17,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "복합",
+      "개박",
+      "질주"
+    ],
+    "reference": false,
+    "desc": "채보: Zeyu on The Universal Forums.",
+    "tufId": 9118,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-1079",
+    "name": "M1LLI0N PP (unnerfed)",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U10",
+    "legacy": "21.2",
+    "keys": 17,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "복합",
+      "개박",
+      "질주"
+    ],
+    "reference": false,
+    "desc": "채보: Nephrolepis on The Universal Forums.",
+    "tufId": 1079,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-2546",
+    "name": "Bismuth",
+    "creator": "Ludicin",
+    "pgu": "U10",
+    "legacy": "21.2",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "복합"
+    ],
+    "reference": false,
+    "desc": "채보: CCNekona, delphine on The Universal Forums.",
+    "tufId": 2546,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-1833",
+    "name": "MCCXVI",
+    "creator": "JinoBeats",
+    "pgu": "U10",
+    "legacy": "21.2",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "질주",
+      "복합"
+    ],
+    "reference": false,
+    "desc": "채보: 유한 / Youhan on The Universal Forums.",
+    "tufId": 1833,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-17017",
+    "name": "INVERSION",
+    "creator": "tn-shi",
+    "pgu": "U15",
+    "legacy": "21.3+",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "질주",
+      "복합",
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: hallunacy on The Universal Forums.",
+    "tufId": 17017,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-12707",
+    "name": "Hello (BPM) 2026",
+    "creator": "Camellia (かめりあ)",
+    "pgu": "U18",
+    "legacy": null,
+    "keys": 17,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "복합",
+      "개박",
+      "체력",
+      "기믹"
+    ],
+    "reference": false,
+    "desc": "채보: 알파, Asansis &amp; 11 more on The Universal Forums.",
+    "tufId": 12707,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-1469",
+    "name": "The Most Durable Electronic Machine Whose Name Is &quot;IDPLMA&quot; Has Been Released By Mechanical Engineers in Washington D.C. (nerfed)",
+    "creator": "Seedbean",
+    "pgu": "U19",
+    "legacy": null,
+    "keys": 17,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "질주",
+      "복합"
+    ],
+    "reference": false,
+    "desc": "채보: 韓狼 &amp; 6 more on The Universal Forums.",
+    "tufId": 1469,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-32",
+    "name": "Fledgling",
+    "creator": "Sot-C",
+    "pgu": "U10",
+    "legacy": "21.2",
+    "keys": 10,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "개박"
+    ],
+    "reference": false,
+    "desc": "채보: BWen, Editor AlriC on The Universal Forums.",
+    "tufId": 32,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-15558",
+    "name": "Encore.",
+    "creator": "打打だいず",
+    "pgu": "U9",
+    "legacy": "21.2",
+    "keys": 16,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "복합"
+    ],
+    "reference": false,
+    "desc": "채보: Nephrolepis, Becl_ &amp; 1 more on The Universal Forums.",
+    "tufId": 15558,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-15557",
+    "name": "DEVOTION 〜反影への進撃、恐怖への信撃〜",
+    "creator": "EPC Sound Team",
+    "pgu": "U9",
+    "legacy": "21.2",
+    "keys": 12,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주"
+    ],
+    "reference": false,
+    "desc": "채보: Ryuha, Farpait &amp; 3 more on The Universal Forums.",
+    "tufId": 15557,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-12380",
+    "name": "Phantigma",
+    "creator": "打打だいず",
+    "pgu": "U9",
+    "legacy": "21.2",
+    "keys": 12,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "체력",
+      "동타"
+    ],
+    "reference": false,
+    "desc": "채보: Nephrolepis, Bingsu on The Universal Forums.",
+    "tufId": 12380,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-3776",
+    "name": "LΛ8YRИTH",
+    "creator": "AWC Sound Team",
+    "pgu": "U9",
+    "legacy": "21.2",
+    "keys": 12,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "복합"
+    ],
+    "reference": false,
+    "desc": "채보: 韓狼 &amp; 7 more, Ocbim &amp; 10 more on The Universal Forums.",
+    "tufId": 3776,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-3774",
+    "name": "Serrate (ex)",
+    "creator": "Sydosys",
+    "pgu": "U9",
+    "legacy": "21.2",
+    "keys": 12,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "개박"
+    ],
+    "reference": false,
+    "desc": "채보: Daccaplores, 韓狼 &amp; 1 more on The Universal Forums.",
+    "tufId": 3774,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-2856",
+    "name": "Icyxis ~True Ending~",
+    "creator": "Raimukun",
+    "pgu": "U9",
+    "legacy": "21.2",
+    "keys": 12,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "체력"
+    ],
+    "reference": false,
+    "desc": "채보: 한가지, 韓狼 &amp; 5 more on The Universal Forums.",
+    "tufId": 2856,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-10419",
+    "name": "SHIRO",
+    "creator": "DJ Raisei",
+    "pgu": "U8",
+    "legacy": "21.1+",
+    "keys": 12,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "질주",
+      "체력",
+      "복합"
+    ],
+    "reference": false,
+    "desc": "채보: 새제비 &amp; 1 more, Editor AlriC &amp; 7 more on The Universal Forums.",
+    "tufId": 10419,
+    "videoUrl": ""
+  },
+  {
+    "id": "tuf-3763",
+    "name": "Serrate",
+    "creator": "Sydosys",
+    "pgu": "U8",
+    "legacy": "21.1+",
+    "keys": 12,
+    "keyLimit": false,
+    "bpm": null,
+    "patterns": [
+      "체력",
+      "개박"
+    ],
+    "reference": false,
+    "desc": "채보: Daccaplores, 韓狼 &amp; 1 more on The Universal Forums.",
+    "tufId": 3763,
+    "videoUrl": ""
+  }
+]
