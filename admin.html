@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>관리자 · ADOFAI ANALYZER</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body class="adm">
+  <header class="adm-top">
+    <a class="adm-back" href="index.html">← 메인으로</a>
+    <h1>관리자 <em>ADMIN</em></h1>
+    <div class="adm-user">
+      <span id="adm-who" class="hidden"></span>
+      <button class="abtn ghost hidden" id="adm-logout" type="button">로그아웃</button>
+    </div>
+  </header>
+
+  <main class="adm-main">
+    <!-- 접속 상태에 따라 하나만 보이는 안내/로그인 -->
+    <section class="adm-gate" id="gate">
+      <p id="gate-msg">확인하는 중…</p>
+      <form id="gate-form" class="hidden" autocomplete="off">
+        <label>관리자 ID<input id="g-id" type="text" required /></label>
+        <label>비밀번호<input id="g-pw" type="password" maxlength="14" required /></label>
+        <p class="amsg" id="g-err"></p>
+        <button class="abtn primary" type="submit">로그인</button>
+      </form>
+    </section>
+
+    <section class="adm-panel hidden" id="panel">
+      <nav class="adm-tabs" role="tablist">
+        <button role="tab" class="on" data-tab="dash">대시보드</button>
+        <button role="tab" data-tab="notice">공지 관리</button>
+        <button role="tab" data-tab="users">회원</button>
+      </nav>
+
+      <!-- 대시보드 -->
+      <div class="tab on" id="tab-dash">
+        <div class="stat-grid" id="stat-grid"></div>
+        <h2>가장 많이 저장된 맵</h2>
+        <ol class="toplist" id="toplist"></ol>
+      </div>
+
+      <!-- 공지 -->
+      <div class="tab" id="tab-notice">
+        <div class="notice-wrap">
+          <div class="n-left">
+            <div class="n-left-head"><h2>공지 목록</h2><button class="abtn primary" id="n-new" type="button">+ 새 공지</button></div>
+            <div id="n-list" class="n-list"></div>
+          </div>
+          <form class="n-form" id="n-form" autocomplete="off">
+            <h2 id="n-form-title">새 공지</h2>
+            <div class="row2">
+              <label>날짜<input id="n-date" type="date" required /></label>
+              <label>종류
+                <select id="n-type"><option value="update">업데이트</option><option value="map">맵 추가</option><option value="info">안내</option></select>
+              </label>
+            </div>
+            <label>제목 <small id="n-title-cnt">0/80</small><input id="n-title" type="text" maxlength="80" required /></label>
+            <label>본문 <small id="n-body-cnt">0/2000</small>
+              <textarea id="n-body" rows="8" maxlength="2000" required placeholder="줄을 바꾸면 문단이 나뉩니다."></textarea>
+            </label>
+            <div class="checks">
+              <label class="chk"><input type="checkbox" id="n-pinned" /> 맨 위에 고정</label>
+              <label class="chk"><input type="checkbox" id="n-hidden" /> 숨김 (사이트에 안 보임)</label>
+            </div>
+            <p class="n-src" id="n-src"></p>
+            <p class="amsg" id="n-msg"></p>
+            <div class="n-actions">
+              <button class="abtn primary" type="submit" id="n-save">저장</button>
+              <button class="abtn danger hidden" type="button" id="n-del">삭제</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- 회원 -->
+      <div class="tab" id="tab-users">
+        <div class="u-head"><h2>회원 <span id="u-count"></span></h2><input id="u-search" type="search" placeholder="ID 또는 닉네임 검색" /></div>
+        <div class="u-table" id="u-table"></div>
+      </div>
+    </section>
+  </main>
+  <div class="atoast hidden" id="atoast" role="status"></div>
+  <script src="admin.js"></script>
+</body>
+</html>
