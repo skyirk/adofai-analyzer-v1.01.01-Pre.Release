@@ -27,3 +27,15 @@ CREATE TABLE IF NOT EXISTS saved (
   created_at  INTEGER NOT NULL,
   PRIMARY KEY (user_id, level_id)
 );
+
+-- 공지사항 (관리자 페이지에서 작성). notices.json 의 공지와 같은 id 로 저장하면 그 공지를 덮어쓰거나(hidden=1 이면 숨김) 합니다.
+CREATE TABLE IF NOT EXISTS notices (
+  id          TEXT PRIMARY KEY,
+  date        TEXT NOT NULL,               -- YYYY-MM-DD
+  type        TEXT NOT NULL,               -- update | map | info
+  title       TEXT NOT NULL,
+  body        TEXT NOT NULL,
+  pinned      INTEGER NOT NULL DEFAULT 0,
+  hidden      INTEGER NOT NULL DEFAULT 0,
+  updated_at  INTEGER NOT NULL
+);
