@@ -6,6 +6,15 @@
  *   POST /api/login     로그인
  *   POST /api/logout    로그아웃
  *   POST /api/saved     맵 저장/해제  { levelId, on: true|false }
+ *   GET  /api/notices   공지사항 목록 (숨김 처리된 것 포함. 화면에서 걸러 냄)
+ *
+ *   관리자 전용 (환경 변수 ADMIN_IDS 에 적은 ID 로 로그인했을 때만):
+ *   GET  /api/admin/stats     통계
+ *   GET  /api/admin/notices   공지 전체
+ *   POST /api/admin/notice    공지 저장  { id?, date, type, title, body, pinned, hidden }
+ *   POST /api/admin/notice-delete  { id }
+ *   GET  /api/admin/users     회원 목록
+ *   POST /api/admin/user-delete    { id }
  *
  * D1 바인딩 이름은 반드시 DB 여야 합니다 (README 참고). 테이블은 schema.sql 로 만듭니다.
  * 비밀번호는 PBKDF2-SHA256(10만 회) + 사용자별 소금값으로 저장하고, 로그인 세션은
@@ -77,13 +86,20 @@ async function startSession(env, userId, secure) {
 const savedList = async (env, userId) =>
   (await env.DB.prepare("SELECT level_id FROM saved WHERE user_id = ? ORDER BY created_at, level_id").bind(userId).all()).results.map((r) => r.level_id);
 
-async function body(request) {
+async function body(request, max = 4096) {
   const ct = request.headers.get("content-type") || "";
   if (!ct.includes("application/json")) return null;
   const text = await request.text();
-  if (text.length > 4096) return null;
+  if (text.length > max) return null;
   try { const v = JSON.parse(text); return v && typeof v === "object" ? v : null; } catch { return null; }
 }
+
+/* ---- 관리자 ---- */
+const isAdmin = (env, u) => !!u && String(env.ADMIN_IDS || "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean).includes(u.id.toLowerCase());
+const NOTICE_TYPES = ["update", "map", "info"];
+const rowToNotice = (r) => ({ id: r.id, date: r.date, type: r.type, title: r.title, body: r.body, pinned: !!r.pinned, hidden: !!r.hidden });
+const noticeList = async (env) =>
+  (await env.DB.prepare("SELECT id, date, type, title, body, pinned, hidden FROM notices ORDER BY pinned DESC, date DESC, updated_at DESC").all()).results.map(rowToNotice);
 
 export async function onRequest({ request, env }) {
   try {
@@ -100,7 +116,7 @@ export async function onRequest({ request, env }) {
 
     if (route === "me" && method === "GET") {
       const u = await currentUser(env, request);
-      return json({ ok: true, user: u ? { id: u.id, nick: u.nick } : null, saved: u ? await savedList(env, u.id) : [] });
+      return json({ ok: true, user: u ? { id: u.id, nick: u.nick, admin: isAdmin(env, u) } : null, saved: u ? await savedList(env, u.id) : [] });
     }
 
     if (route === "nick" && method === "GET") {
@@ -176,6 +192,78 @@ export async function onRequest({ request, env }) {
         await env.DB.prepare("DELETE FROM saved WHERE user_id = ? AND level_id = ?").bind(u.id, b.levelId).run();
       }
       return json({ ok: true, saved: await savedList(env, u.id) });
+    }
+
+    if (route === "notices" && method === "GET") {       // 공개: 테이블이 아직 없어도 사이트가 깨지지 않게 빈 목록
+      try { return json({ ok: true, notices: await noticeList(env) }); } catch { return json({ ok: true, notices: [] }); }
+    }
+
+    if (route.startsWith("admin/")) {
+      const u = await currentUser(env, request);
+      if (!u) return fail(401, "로그인이 필요합니다.");
+      if (!isAdmin(env, u)) return fail(403, "관리자 권한이 없습니다.");
+      const r = route.slice(6);
+
+      if (r === "stats" && method === "GET") {
+        const one = async (sql, ...a) => (await env.DB.prepare(sql).bind(...a).first()) || {};
+        const top = (await env.DB.prepare("SELECT level_id, COUNT(*) AS c FROM saved GROUP BY level_id ORDER BY c DESC, level_id LIMIT 10").all()).results;
+        const day = now() - 7 * 24 * 3600;
+        return json({
+          ok: true,
+          users: (await one("SELECT COUNT(*) AS c FROM users")).c,
+          newUsers7d: (await one("SELECT COUNT(*) AS c FROM users WHERE created_at > ?", day)).c,
+          sessions: (await one("SELECT COUNT(*) AS c FROM sessions WHERE expires_at > ?", now())).c,
+          saved: (await one("SELECT COUNT(*) AS c FROM saved")).c,
+          notices: (await one("SELECT COUNT(*) AS c FROM notices")).c,
+          topSaved: top.map((t) => ({ levelId: t.level_id, count: t.c })),
+        });
+      }
+
+      if (r === "notices" && method === "GET") return json({ ok: true, notices: await noticeList(env) });
+
+      if (r === "notice" && method === "POST") {
+        const b = await body(request, 8192);
+        if (!b) return fail(400, "요청 형식이 올바르지 않습니다.");
+        const title = typeof b.title === "string" ? b.title.trim() : "", text = typeof b.body === "string" ? b.body.trim() : "";
+        if (!title || title.length > 80) return fail(400, "제목은 1~80자로 입력해 주세요.", { field: "title" });
+        if (!text || text.length > 2000) return fail(400, "본문은 1~2000자로 입력해 주세요.", { field: "body" });
+        if (!NOTICE_TYPES.includes(b.type)) return fail(400, "종류가 올바르지 않습니다.", { field: "type" });
+        if (typeof b.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(b.date)) return fail(400, "날짜는 YYYY-MM-DD 형식이어야 합니다.", { field: "date" });
+        let id = typeof b.id === "string" && b.id ? b.id : "d-" + randHex(5);
+        if (!/^[A-Za-z0-9_-]{1,40}$/.test(id)) return fail(400, "공지 ID 형식이 올바르지 않습니다.");
+        await env.DB.prepare(
+          "INSERT INTO notices (id, date, type, title, body, pinned, hidden, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) " +
+          "ON CONFLICT(id) DO UPDATE SET date = excluded.date, type = excluded.type, title = excluded.title, body = excluded.body, pinned = excluded.pinned, hidden = excluded.hidden, updated_at = excluded.updated_at"
+        ).bind(id, b.date, b.type, title, text, b.pinned ? 1 : 0, b.hidden ? 1 : 0, now()).run();
+        return json({ ok: true, id, notices: await noticeList(env) });
+      }
+
+      if (r === "notice-delete" && method === "POST") {
+        const b = await body(request);
+        if (!b || typeof b.id !== "string" || !/^[A-Za-z0-9_-]{1,40}$/.test(b.id)) return fail(400, "요청 형식이 올바르지 않습니다.");
+        await env.DB.prepare("DELETE FROM notices WHERE id = ?").bind(b.id).run();
+        return json({ ok: true, notices: await noticeList(env) });
+      }
+
+      if (r === "users" && method === "GET") {
+        const rows = (await env.DB.prepare(
+          "SELECT u.id AS id, u.nick AS nick, u.created_at AS created_at, (SELECT COUNT(*) FROM saved s WHERE s.user_id = u.id) AS saved FROM users u ORDER BY u.created_at DESC LIMIT 500"
+        ).all()).results;
+        return json({ ok: true, users: rows.map((x) => ({ id: x.id, nick: x.nick, createdAt: x.created_at, saved: x.saved, admin: isAdmin(env, x) })) });
+      }
+
+      if (r === "user-delete" && method === "POST") {
+        const b = await body(request);
+        if (!b || typeof b.id !== "string" || b.id.length > 64) return fail(400, "요청 형식이 올바르지 않습니다.");
+        if (b.id.toLowerCase() === u.id.toLowerCase() || isAdmin(env, { id: b.id })) return fail(400, "관리자 계정은 여기서 삭제할 수 없습니다.");
+        await env.DB.batch([
+          env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(b.id),
+          env.DB.prepare("DELETE FROM saved WHERE user_id = ?").bind(b.id),
+          env.DB.prepare("DELETE FROM users WHERE id = ?").bind(b.id),
+        ]);
+        return json({ ok: true });
+      }
+      return fail(404, "없는 주소입니다.");
     }
 
     return fail(404, "없는 주소입니다.");
