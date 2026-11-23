@@ -118,6 +118,7 @@
     <nav class="nav">
       <button class="btn" id="btn-recommend">맵 추천</button>
       <button class="btn" id="btn-saved">저장한 맵</button>
+      <button class="btn" id="btn-notice" type="button">공지사항<span class="nbadge hidden" id="notice-badge" aria-label="새 공지"></span></button>
       <a class="btn ghost" id="link-tuf" target="_blank" rel="noopener">tuforums.com</a>
       <a class="btn ghost" id="link-levels" target="_blank" rel="noopener">ADOFAI 레벨 포럼</a>
     </nav>
@@ -125,6 +126,7 @@
       <span id="user-label" class="user-label hidden"></span>
       <button class="btn" id="btn-login">로그인</button>
       <button class="btn primary" id="btn-signup">회원가입</button>
+      <a class="btn ghost hidden" id="link-admin" href="admin.html">관리자</a>
       <button class="btn ghost hidden" id="btn-logout">로그아웃</button>
       <button class="btn ghost" id="btn-close">닫기</button>
     </div>
@@ -195,6 +197,15 @@
     <div class="modal-card wide">
       <button class="modal-x" data-close>✕</button>
       <div id="detail-body"></div>
+    </div>
+  </div>
+
+  <!-- 공지사항 모달 -->
+  <div class="modal hidden" id="modal-notice">
+    <div class="modal-card wide notice-card" role="dialog" aria-labelledby="notice-title">
+      <button type="button" class="modal-x" data-close aria-label="닫기">✕</button>
+      <h2 id="notice-title">공지사항</h2>
+      <div class="notice-list" id="notice-list"></div>
     </div>
   </div>
 
