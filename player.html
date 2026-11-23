@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>맵 테스트 · ADOFAI ANALYZER</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" />
+  <link rel="stylesheet" href="player.css" />
+</head>
+<body class="pl">
+  <header class="pl-top">
+    <a class="pl-back" href="index.html">← 메인으로</a>
+    <h1>맵 테스트 <em>AUTO</em></h1>
+    <div class="pl-files">
+      <label class="pbtn primary">맵 열기 (.adofai)<input type="file" id="f-map" accept=".adofai,.json,.txt" hidden /></label>
+      <label class="pbtn">음악 열기<input type="file" id="f-audio" accept="audio/*,.mp3,.ogg,.wav,.m4a,.flac" hidden /></label>
+    </div>
+  </header>
+
+  <main class="pl-main">
+    <div class="stage" id="stage">
+      <canvas id="cv"></canvas>
+      <div class="hud"><span id="hud-title"></span></div>
+      <div class="empty" id="empty">
+        <div>
+          <h2>.adofai 파일을 여기에 놓으세요</h2>
+          <p>위의 <b>맵 열기</b> 버튼이나 끌어다 놓기로 불러옵니다.<br />음악 파일(mp3 / ogg / wav)도 함께 놓으면 소리가 나옵니다.</p>
+          <p class="small">오토 재생 전용 · 파일은 서버로 올라가지 않고 이 브라우저에서만 처리됩니다.</p>
+        </div>
+      </div>
+      <aside class="info hidden" id="info">
+        <div class="info-head"><b>맵 정보</b><button class="pbtn sm ghost" id="info-close" type="button">닫기</button></div>
+        <div id="info-body"></div>
+      </aside>
+    </div>
+    <div class="pmsg" id="pmsg" role="status"></div>
+  </main>
+
+  <footer class="ctrl">
+    <button class="pbtn primary" id="c-play" type="button" disabled>재생</button>
+    <input type="range" id="c-seek" min="0" max="1" step="0.01" value="0" disabled aria-label="재생 위치" />
+    <span class="time" id="c-time">0:00.00 / 0:00.00</span>
+    <label class="cl">배속
+      <select id="c-rate" disabled>
+        <option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="0.75">0.75x</option>
+        <option value="1" selected>1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2x</option>
+      </select>
+    </label>
+    <label class="cl">음량 <input type="range" id="c-vol" min="0" max="1" step="0.05" value="0.6" disabled /></label>
+    <label class="cl chk"><input type="checkbox" id="c-hit" disabled /> 히트음</label>
+    <label class="cl">싱크(ms) <input type="number" id="c-off" value="0" step="10" disabled /></label>
+    <button class="pbtn" id="c-info" type="button" disabled>정보</button>
+    <button class="pbtn" id="c-fs" type="button" disabled>전체화면</button>
+  </footer>
+  <script src="player.js"></script>
+</body>
+</html>
