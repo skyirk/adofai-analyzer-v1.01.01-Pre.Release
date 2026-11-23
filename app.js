@@ -91,7 +91,7 @@
 
   const Auth = {
     users() { return LS.get("adofai_users", {}); },
-    session() { return Remote.mode === "remote" ? (Remote.user ? { id: Remote.user.id, nick: Remote.user.nick } : null) : LS.get("adofai_session", null); },
+    session() { return Remote.mode === "remote" ? (Remote.user ? { id: Remote.user.id, nick: Remote.user.nick, admin: !!Remote.user.admin } : null) : LS.get("adofai_session", null); },
     async hash(pw, salt) {
       const data = new TextEncoder().encode(salt + ":" + pw);
       if (window.crypto && crypto.subtle) {
@@ -225,6 +225,62 @@
     } catch (e) {
       loadError = true;   // file:// 로 직접 열면 fetch 가 막힐 수 있음
     }
+  }
+
+  /* ================= 공지사항 (notices.json) ================= */
+  let NOTICES = [];
+  const NOTICE_TYPES = { update: "업데이트", map: "맵 추가", info: "안내" };
+  async function loadNotices() {
+    try {
+      const r = await fetch("notices.json", { cache: "no-cache" });
+      if (!r.ok) throw new Error(r.status);
+      NOTICES = await r.json();
+    } catch (e) { NOTICES = []; }
+    if (!Array.isArray(NOTICES)) NOTICES = [];
+    if (Remote.mode === "remote") {          // 관리자 페이지에서 쓴 공지(D1)를 합침. 같은 id 면 D1 쪽이 우선, hidden 이면 숨김
+      try {
+        const { data } = await Remote.call("notices");
+        if (data && data.ok && Array.isArray(data.notices)) {
+          const map = new Map(NOTICES.filter((n) => n && n.id).map((n) => [n.id, n]));
+          data.notices.forEach((n) => map.set(n.id, n));
+          NOTICES = [...map.values()];
+        }
+      } catch (e) { /* 서버 공지는 못 불러와도 파일 공지는 보여 줌 */ }
+    }
+    NOTICES = NOTICES.filter((n) => n && n.id && n.title && !n.hidden).sort((a, b) =>
+      (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || String(b.date || "").localeCompare(String(a.date || "")));
+  }
+  const noticeSeen = () => new Set(LS.get("adofai.notice.seen", []));
+  function noticeBadge() {
+    const seen = noticeSeen(), n = NOTICES.filter((x) => !seen.has(x.id)).length;
+    const b = $("#notice-badge");
+    if (!b) return;
+    b.textContent = n > 9 ? "9+" : String(n);
+    b.classList.toggle("hidden", n === 0);
+  }
+  function renderNotices() {
+    const box = $("#notice-list"), seen = noticeSeen();
+    box.replaceChildren();
+    if (!NOTICES.length) { box.append(el("p", "notice-empty", "등록된 공지가 없습니다.")); return; }
+    NOTICES.forEach((n, i) => {
+      const isNew = !seen.has(n.id), item = el("article", "nitem" + (n.pinned ? " pinned" : ""));
+      const head = el("button", "nitem-head"); head.type = "button";
+      const type = el("span", "ntype t-" + (NOTICE_TYPES[n.type] ? n.type : "info"), n.pinned ? "고정" : (NOTICE_TYPES[n.type] || "안내"));
+      const title = el("span", "ntitle", n.title);
+      if (isNew) title.append(el("em", "nnew", "NEW"));
+      head.append(type, title, el("span", "ndate", n.date || ""), el("span", "nchev", "›"));
+      const body = el("div", "nitem-body");
+      String(n.body || "").split("\n").filter(Boolean).forEach((line) => body.append(el("p", "", line)));
+      const open = i === 0 || isNew && i < 2;
+      item.classList.toggle("open", open); head.setAttribute("aria-expanded", String(open));
+      head.onclick = () => { const o = item.classList.toggle("open"); head.setAttribute("aria-expanded", String(o)); };
+      item.append(head, body); box.append(item);
+    });
+  }
+  function openNotices() {
+    renderNotices(); openModal("notice");
+    LS.set("adofai.notice.seen", NOTICES.map((n) => n.id));      // 열어 본 순간 모두 읽음 처리 (이번 화면에는 NEW 가 남아 있음)
+    noticeBadge();
   }
 
   // 포럼 링크: forumUrl 이 있으면 그것, 없으면 tufId 로 TUF 맵 페이지 주소를 만든다
@@ -461,6 +517,7 @@
     $("#btn-login").classList.toggle("hidden", !!s);
     $("#btn-signup").classList.toggle("hidden", !!s);
     $("#btn-logout").classList.toggle("hidden", !s);
+    $("#link-admin").classList.toggle("hidden", !(s && s.admin));      // 관리자 계정일 때만 보임
   }
 
   function setMsg(id, text, ok) {
@@ -540,6 +597,7 @@
       if (!Auth.session()) { toast("저장한 맵은 로그인 후 볼 수 있습니다."); openModal("login"); return; }
       state.view = "saved"; renderList();
     };
+    $("#btn-notice").onclick = openNotices;
     $("#btn-login").onclick = () => openModal("login");
     $("#btn-signup").onclick = () => openModal("signup");
     $("#btn-logout").onclick = async () => { await Auth.logout(); state.view = "recommend"; refreshAuthUI(); renderList(); };
@@ -555,6 +613,8 @@
 
     bindSignup(); bindLogin(); refreshAuthUI();
     await Promise.all([Remote.init(), loadLevels()]);
+    await loadNotices();
+    noticeBadge();
     buildLadder();
     refreshAuthUI();
     renderList();
