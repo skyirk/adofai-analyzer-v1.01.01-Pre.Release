@@ -70,8 +70,8 @@
   }
 
   /* ---------- 지원 이벤트 ---------- */
-  const SUPPORTED = new Set(["SetSpeed", "Twirl", "Pause", "Hold", "MoveCamera", "MoveTrack", "PositionTrack", "ColorTrack", "RecolorTrack", "Flash", "SetFilter", "Bloom", "ShakeScreen", "CustomBackground", "MoveDecorations", "AddDecoration", "AddText"]);
-  const HARMLESS = new Set(["EditorComment", "Bookmark", "SetHitsound", "Checkpoint", "SetPlanetRotation", "AnimateTrack", "SetFrameRate", "SetFloorIcon", "ScaleMargin", "ScaleRadius", "ScalePlanets"]);
+  const SUPPORTED = new Set(["SetSpeed", "Twirl", "Pause", "Hold", "MoveCamera", "MoveTrack", "PositionTrack", "ColorTrack", "RecolorTrack", "Flash", "SetFilter", "Bloom", "ShakeScreen", "CustomBackground", "MoveDecorations", "AddDecoration", "AddText", "AddObject", "SetObject", "RepeatEvents", "ScalePlanets", "ScaleRadius", "AnimateTrack"]);
+  const HARMLESS = new Set(["EditorComment", "Bookmark", "SetHitsound", "Checkpoint", "SetFrameRate", "SetFloorIcon", "ScaleMargin", "Hide", "PlaySound"]);
   const FILTER_CSS = {
     Grayscale: (i) => `grayscale(${i}%)`, Sepia: (i) => `sepia(${i}%)`, Invert: (i) => `invert(${i}%)`,
     Blur: (i) => `blur(${(i / 100) * 8}px)`, BlurFocus: (i) => `blur(${(i / 100) * 5}px)`,
@@ -99,10 +99,25 @@
       mid[i] = ang[i] === 999;
       eff[i] = mid[i] ? mod((i > 0 ? eff[i - 1] : 0) + 180, 360) : mod(ang[i], 360);
     }
-    const X = new Float64Array(n), Y = new Float64Array(n);
+    const IX = new Float64Array(n), IY = new Float64Array(n);
     for (let i = 0; i < n - 1; i++) {
-      X[i + 1] = X[i] + Math.cos(eff[i] * D2R);
-      Y[i + 1] = Y[i] + Math.sin(eff[i] * D2R);
+      IX[i + 1] = IX[i] + Math.cos(eff[i] * D2R);
+      IY[i + 1] = IY[i] + Math.sin(eff[i] * D2R);
+    }
+    // PositionTrack: 위치 오프셋은 이후 타일에도 이어지고(justThisTile 제외), 그 타일만 옮기는 경우도 있음
+    const X = new Float64Array(n), Y = new Float64Array(n), SHX = new Float64Array(n), SHY = new Float64Array(n);
+    {
+      let px = 0, py = 0;
+      for (let i = 0; i < n; i++) {
+        let jx = 0, jy = 0;
+        for (const ev of byFloor[i]) {
+          if (ev.eventType !== "PositionTrack" || bool(ev.editorOnly) || ev.active === false || !Array.isArray(ev.positionOffset)) continue;
+          const ox = Number(ev.positionOffset[0]) || 0, oy = Number(ev.positionOffset[1]) || 0;
+          if (bool(ev.justThisTile)) { jx += ox; jy += oy; } else { px += ox; py += oy; }
+        }
+        X[i] = IX[i] + px + jx; Y[i] = IY[i] + py + jy;
+      }
+      for (let i = 0; i < n - 1; i++) { SHX[i] = X[i + 1] - X[i] - (IX[i + 1] - IX[i]); SHY[i] = Y[i + 1] - Y[i] - (IY[i + 1] - IY[i]); }
     }
     const aIn = new Float64Array(n), aOut = new Float64Array(n);
     for (let i = 0; i < n; i++) {
@@ -162,8 +177,6 @@
             style: ev.trackStyle || cur.style,
           };
         } else if (ev.eventType === "PositionTrack" && !bool(ev.editorOnly)) {
-          const p = ev.positionOffset;
-          if (Array.isArray(p)) { base.dx[i] = Number(p[0]) || 0; base.dy[i] = Number(p[1]) || 0; }
           if (typeof ev.rotation === "number") base.rot[i] = ev.rotation;
           if (typeof ev.opacity === "number") base.op[i] = ev.opacity / 100;
           if (typeof ev.scale === "number") { base.sx[i] = base.sy[i] = ev.scale / 100; }
@@ -176,11 +189,35 @@
     // 동적 이벤트
     const timed = [], cams = [], flashes = [], shakes = [], filtEv = [], bloomEv = [], bgEv = [];
     const typeCount = {}, unsupportedFilters = new Set();
+    const byT = (a, b) => a.t - b.t;
+    for (const ev of actions) typeCount[ev.eventType] = (typeCount[ev.eventType] || 0) + 1;
+    // 태그가 붙은 이벤트는 RepeatEvents 가 불러줄 때만 실행됨
+    const tagged = [], items = [];
     for (const ev of actions) {
-      const type = ev.eventType;
-      typeCount[type] = (typeCount[type] || 0) + 1;
-      if (!((ev.floor | 0) >= 0 && (ev.floor | 0) < n)) continue;
-      const t = evT(ev), dur = evDur(ev), f = ev.floor | 0;
+      const f0 = ev.floor | 0;
+      if (!(f0 >= 0 && f0 < n)) continue;
+      const tg = typeof ev.eventTag === "string" ? ev.eventTag.trim() : "";
+      if (tg && ev.eventType !== "RepeatEvents") tagged.push({ ev, tags: tg.split(/\s+/) });
+      else items.push({ ev, t: evT(ev) });
+    }
+    for (const re of actions) {
+      if (re.eventType !== "RepeatEvents" || items.length > 400000) continue;
+      const F = re.floor | 0, rt = String(re.tag || "").split(/\s+/).filter(Boolean);
+      if (!rt.length) continue;
+      const fc = Math.max(1, Number(re.floorCount) || 1), reps = clamp(Number(re.repetitions) || 0, 0, 2000), iv = Number(re.interval) || 1;
+      for (const tg of tagged) {
+        const f0 = tg.ev.floor | 0;
+        if (f0 < F || f0 >= F + fc || !tg.tags.some((x) => rt.includes(x))) continue;
+        if (bool(re.executeOnCurrentFloor)) items.push({ ev: tg.ev, t: evT(tg.ev) });
+        for (let k = 1; k <= reps; k++) {
+          if (re.repeatType === "Beat") items.push({ ev: tg.ev, t: evT(tg.ev) + k * iv * beatAt(f0) });
+          else { const f2 = f0 + k * iv; if (f2 >= n) break; const ev2 = { ...tg.ev, floor: f2 }; items.push({ ev: ev2, t: evT(ev2) }); }
+        }
+      }
+    }
+    items.sort(byT);
+    for (const it of items) {
+      const ev = it.ev, type = ev.eventType, t = it.t, dur = evDur(ev), f = ev.floor | 0;
       switch (type) {
         case "MoveTrack": timed.push({ t, dur, kind: "move", ev, a: tileRef(ev.startTile, f, f), b: tileRef(ev.endTile, f, f), ease: easeFn(ev.ease) }); break;
         case "RecolorTrack": timed.push({ t, dur: 0, kind: "recolor", ev, a: tileRef(ev.startTile, f, f), b: tileRef(ev.endTile, f, f) }); break;
@@ -193,7 +230,6 @@
         default: break;
       }
     }
-    const byT = (a, b) => a.t - b.t;
     [timed, cams, flashes, shakes, filtEv, bloomEv, bgEv].forEach((l) => l.sort(byT));
 
     // 카메라 상태 (이벤트마다 도착 상태)
@@ -234,36 +270,53 @@
       return pb;
     });
 
-    // 데코레이션
-    const decos = [], fromActions = new Set(actions);
-    const decSrc = (Array.isArray(m.decorations) ? m.decorations : []).concat(actions.filter((a) => a.eventType === "AddDecoration" || a.eventType === "AddText"));
-    const v2 = (v, d) => (Array.isArray(v) ? [Number(v[0]), Number(v[1])] .map((x, k) => (Number.isFinite(x) ? x : d[k])) : d);
+    // 데코레이션 / 오브젝트(AddObject: 타일·플래닛 모양)
+    const decos = [];
+    const DEC_KINDS = ["AddDecoration", "AddText", "AddObject"];
+    const decSrc = (Array.isArray(m.decorations) ? m.decorations : []).concat(actions.filter((a) => DEC_KINDS.includes(a.eventType)));
+    const v2 = (v, d) => (Array.isArray(v) ? [Number(v[0]), Number(v[1])].map((x, k) => (Number.isFinite(x) ? x : d[k])) : d);
     for (const d of decSrc) {
-      if (d.eventType !== "AddDecoration" && d.eventType !== "AddText") continue;
-      if (!fromActions.has(d)) typeCount[d.eventType] = (typeCount[d.eventType] || 0) + 1;
-      const par = Array.isArray(d.parallax) && d.parallax[0] >= 0 ? v2(d.parallax, [100, 100]) : null;
+      const kind = d.eventType;
+      if (!DEC_KINDS.includes(kind)) continue;
+      typeCount[kind] = (typeCount[kind] || 0) + 1;
+      const pr = v2(d.parallax, [0, 0]);
+      const isPlanet = kind === "AddObject" && d.objectType === "Planet", isFloor = kind === "AddObject" && !isPlanet;
+      let pcol = hex(d.planetColor, hex("ff4d4d"));
+      if (isPlanet) { if (d.planetColorType === "DefaultRed") pcol = hex("ff4d4d"); else if (d.planetColorType === "DefaultBlue") pcol = hex("4d8dff"); }
       decos.push({
-        text: d.eventType === "AddText", img: d.decorationImage || "", str: String(d.decText || "").replace(/<[^>]*>/g, ""),
+        text: kind === "AddText", obj: isPlanet ? "planet" : isFloor ? "floor" : "", angle: Number(d.trackAngle ?? 180), tmid: d.trackType === "Midspin",
+        style: d.trackStyle || "Standard", col: hex(d.trackColor, hex("debb7b")), pcol,
+        img: d.decorationImage || "", str: String(d.decText || "").replace(/<[^>]*>/g, ""),
         pos: v2(d.position, [0, 0]), rel: d.relativeTo || "Tile", floor: clamp(d.floor | 0, 0, n - 1), pivot: v2(d.pivotOffset, [0, 0]), rot: Number(d.rotation) || 0,
-        sc: v2(d.scale, [100, 100]), color: hex(d.color, hex("ffffff")), op: Number(d.opacity ?? 100) / 100, depth: Number(d.depth ?? -1),
-        parallax: par, parOff: v2(d.parallaxOffset, [0, 0]), tags: String(d.tag || "").split(/\s+/).filter(Boolean), visible: d.visible === undefined ? true : bool(d.visible, true),
+        sc: v2(d.scale, [100, 100]), color: hex(d.color, hex("ffffff")), depth: Number(d.depth ?? -1),
+        op: isFloor ? Number(d.trackOpacity ?? 100) / 100 : isPlanet ? 1 : Number(d.opacity ?? 100) / 100,
+        parallax: pr[0] || pr[1] ? pr : null, parOff: v2(d.parallaxOffset, [0, 0]), tags: String(d.tag || "").split(/\s+/).filter(Boolean),
+        visible: d.visible === undefined ? true : bool(d.visible, true),
       });
     }
     const tagMap = {};
     decos.forEach((d, i) => d.tags.forEach((t) => (tagMap[t] = tagMap[t] || []).push(i)));
-    for (const ev of actions) {
-      if (ev.eventType !== "MoveDecorations" || !((ev.floor | 0) >= 0 && (ev.floor | 0) < n)) continue;
+    for (const it of items) {
+      const ev = it.ev;
+      if (ev.eventType !== "MoveDecorations" && ev.eventType !== "SetObject") continue;
       const idx = [...new Set(String(ev.tag || "").split(/\s+/).flatMap((t) => tagMap[t] || []))];
-      if (idx.length) timed.push({ t: evT(ev), dur: evDur(ev), kind: "decmove", ev, idx, ease: easeFn(ev.ease) });
+      if (idx.length) timed.push({ t: it.t, dur: ev.eventType === "MoveDecorations" ? evDur(ev) : 0, kind: ev.eventType === "SetObject" ? "setobj" : "decmove", ev, idx, ease: easeFn(ev.ease) });
     }
     timed.sort(byT);
     const decBack = decos.map((_, i) => i).filter((i) => decos[i].depth > 0).sort((a, b) => decos[b].depth - decos[a].depth);
     const decFront = decos.map((_, i) => i).filter((i) => decos[i].depth <= 0).sort((a, b) => decos[b].depth - decos[a].depth);
 
     // 트랙 등장/퇴장
-    const appear = S.trackAnimation && S.trackAnimation !== "None" ? S.trackAnimation : null;
-    const disappear = S.trackDisappearAnimation && S.trackDisappearAnimation !== "None" ? S.trackDisappearAnimation : null;
-    const ahead = Number(S.beatsAhead ?? 3), behind = Number(S.beatsBehind ?? 4);
+    const nn = (v) => (v && v !== "None" ? v : null);
+    const animBase = { appear: nn(S.trackAnimation), disappear: nn(S.trackDisappearAnimation), ahead: Number(S.beatsAhead ?? 3), behind: Number(S.beatsBehind ?? 4) };
+    let ast = animBase;
+    const animEv = items.filter((it) => it.ev.eventType === "AnimateTrack").map((it) => {
+      const e = it.ev;
+      ast = { appear: e.trackAnimation !== undefined ? nn(e.trackAnimation) : ast.appear, disappear: e.trackDisappearAnimation !== undefined ? nn(e.trackDisappearAnimation) : ast.disappear, ahead: Number(e.beatsAhead ?? ast.ahead), behind: Number(e.beatsBehind ?? ast.behind) };
+      return { t: it.t, state: ast };
+    });
+    const pScale = items.filter((it) => it.ev.eventType === "ScalePlanets").map((it) => ({ t: it.t, v: Number(it.ev.scale ?? 100) })).sort(byT);
+    const rScale = items.filter((it) => it.ev.eventType === "ScaleRadius").map((it) => ({ t: it.t, v: Number(it.ev.scale ?? 100) })).sort(byT);
 
     // 요약
     const bpms = []; for (let i = 0; i < n - 1; i++) bpms.push(bpmAt[i]);
@@ -275,9 +328,9 @@
     const decoCount = 0;
 
     return {
-      S, n, X, Y, eff, mid, aIn, aOut, T, bpmAt, cw, delta, waitT, rotT, byFloor,
+      S, n, X, Y, SHX, SHY, eff, mid, aIn, aOut, T, bpmAt, cw, delta, waitT, rotT, byFloor,
       col1, col2, colMode, tstyle, base, timed, cams, initCam, flashes, shakes,
-      filtEv, filtStates, bloomEv, bloomStates, bgEv, bgStates, bgBase, decos, decBack, decFront, appear, disappear, ahead, behind,
+      filtEv, filtStates, bloomEv, bloomStates, bgEv, bgStates, bgBase, decos, decBack, decFront, animBase, animEv, pScale, rScale,
       pre: (Number(S.countdownTicks ?? 4) || 0) * (60 / (Number(S.bpm) > 0 ? Number(S.bpm) : bpmAt[0])),
       end: T[n - 1] + 2 * (60 / bpmAt[n - 1]),
       info: { images: [...new Set(decos.map((d) => d.img).concat(bgBase.img, bgStates.map((b) => b.img)).filter(Boolean))], tiles: n, bpmMin: Math.min(...bpms), bpmMax: Math.max(...bpms), supported, unsupported, decoCount, unsupportedFilters: [...unsupportedFilters], duration: T[n - 1] },
@@ -294,6 +347,8 @@
       this.c1 = this.L.col1.slice(); this.c2 = this.L.col2.slice(); this.cm = this.L.colMode.slice();
       this.dpx = new Float32Array(this.L.decos.length); this.dpy = new Float32Array(this.L.decos.length); this.drot = new Float32Array(this.L.decos.length);
       this.dsx = Float32Array.from(this.L.decos, (d) => d.sc[0] / 100); this.dsy = Float32Array.from(this.L.decos, (d) => d.sc[1] / 100); this.dop = Float32Array.from(this.L.decos, (d) => d.op);
+      this.dvis = Uint8Array.from(this.L.decos, (d) => (d.visible ? 1 : 0));
+      this.dstyle = this.L.decos.map((d) => d.style); this.dcol = this.L.decos.map((d) => d.col); this.dpcol = this.L.decos.map((d) => d.pcol);
       this.ptr = 0; this.active = []; this.last = -Infinity; this.n = n;
     }
     start(it) {
@@ -306,7 +361,18 @@
         }
         return;
       }
+      if (it.kind === "setobj") {
+        const e = it.ev;
+        for (const i of it.idx) {
+          if (e.trackStyle) this.dstyle[i] = e.trackStyle;
+          if (e.trackColor) this.dcol[i] = hex(e.trackColor, this.dcol[i]);
+          if (e.planetColor) this.dpcol[i] = hex(e.planetColor, this.dpcol[i]);
+          if (typeof e.trackOpacity === "number") this.dop[i] = e.trackOpacity / 100;
+        }
+        return;
+      }
       if (it.kind === "decmove") {
+        if (typeof it.ev.visible === "boolean") for (const i of it.idx) this.dvis[i] = it.ev.visible ? 1 : 0;
         const e = it.ev, tw = { t0: it.t, dur: it.dur, idx: it.idx, ease: it.ease, props: [] };
         const addD = (arr, target, rel) => { if (typeof target === "number" && !Number.isNaN(target)) tw.props.push({ arr, target, rel, s: Float32Array.from(it.idx, (i) => arr[i]) }); };
         const po = e.positionOffset; if (Array.isArray(po)) { addD(this.dpx, po[0]); addD(this.dpy, po[1]); }
@@ -419,20 +485,20 @@
     }
     ctx.globalAlpha = 1;
   }
-  function tileLook(i, t) {
+  function tileLook(i, t, an) {
     // 등장/퇴장 애니메이션 -> [alpha, scale]
     let al = 1, sc = 1;
-    if (L.appear) {
-      const bt = 60 / L.bpmAt[i], aT = Math.max(0.05, L.ahead * bt);
+    if (an.appear) {
+      const bt = 60 / L.bpmAt[i], aT = Math.max(0.05, an.ahead * bt);
       const a = clamp((t - (L.T[i] - aT)) / (aT * 0.45), 0, 1);
       if (a <= 0) return null;
-      al *= a; if (L.appear !== "Fade") sc *= 0.4 + 0.6 * a;
+      al *= a; if (an.appear !== "Fade") sc *= 0.4 + 0.6 * a;
     }
-    if (L.disappear) {
-      const bt = 60 / L.bpmAt[i], bT = Math.max(0.05, L.behind * bt);
+    if (an.disappear) {
+      const bt = 60 / L.bpmAt[i], bT = Math.max(0.05, an.behind * bt);
       const d = clamp((t - (L.T[i] + bT)) / (bT * 0.45), 0, 1);
       if (d >= 1) return null;
-      al *= 1 - d; if (L.disappear !== "Fade") sc *= 1 - 0.6 * d;
+      al *= 1 - d; if (an.disappear !== "Fade") sc *= 1 - 0.6 * d;
     }
     return [al, sc];
   }
@@ -524,26 +590,54 @@
     }
     ctx.restore();
   }
-  function drawDecors(list, cam, shx, shy) {
+  function strokeShape(px, py, qx, qy, style, color, mid) {
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(0, 0); ctx.lineTo(qx, qy);
+    const white = { r: 255, g: 255, b: 255 };
+    if (style === "Basic" || style === "Minimal") { ctx.lineWidth = 0.8; ctx.strokeStyle = css(color); ctx.stroke(); }
+    else if (style === "Neon" || style === "NeonLight") {
+      ctx.lineWidth = 0.9; ctx.strokeStyle = css(color); ctx.stroke();
+      ctx.lineWidth = 0.7; ctx.strokeStyle = style === "NeonLight" ? "rgba(255,255,255,.9)" : "rgba(8,4,16,.92)"; ctx.stroke();
+    } else {
+      ctx.lineWidth = 0.9; ctx.strokeStyle = css(mix(color, white, 0.45), 0.9); ctx.stroke();
+      ctx.lineWidth = 0.74; ctx.strokeStyle = css(color); ctx.stroke();
+    }
+    if (mid) { ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.beginPath(); ctx.moveTo(0, 0.16); ctx.lineTo(0.16, 0); ctx.lineTo(0, -0.16); ctx.lineTo(-0.16, 0); ctx.closePath(); ctx.fill(); }
+  }
+  function drawPlanetAt(x, y, c, k, alpha) {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, 0.42 * k);
+    const base = `rgba(${c.r | 0},${c.g | 0},${c.b | 0},`;
+    g.addColorStop(0, base + (0.66 * alpha).toFixed(3) + ")"); g.addColorStop(1, base + "0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 0.42 * k, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = base + alpha.toFixed(3) + ")"; ctx.strokeStyle = `rgba(255,255,255,${(0.9 * alpha).toFixed(3)})`; ctx.lineWidth = 0.045 * k;
+    ctx.beginPath(); ctx.arc(x, y, 0.17 * k, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  }
+  function drawDecors(list, cam, vis) {
     if (!list.length) return;
-    const R = 40 / Math.max(0.1, cam.zoom / 100);
     for (const di of list) {
       const d = L.decos[di];
-      if (!d.visible) continue;
-      const op = eng.dop[di]; if (op <= 0.003) continue;
+      if (!eng.dvis[di]) continue;
+      const op = eng.dop[di];
+      const alpha = d.obj === "planet" ? eng.dpcol[di].a * op : op;
+      if (alpha <= 0.003) continue;
       let bx, by;
       if (d.rel === "Global") { bx = d.pos[0]; by = d.pos[1]; }
       else if (d.rel === "Camera" || d.rel === "CameraAspect") { bx = cam.x + d.pos[0]; by = cam.y + d.pos[1]; }
       else { bx = L.X[d.floor] + d.pos[0]; by = L.Y[d.floor] + d.pos[1]; }
       bx += eng.dpx[di]; by += eng.dpy[di];
-      if (d.parallax) { bx += (1 - d.parallax[0] / 100) * (cam.x - d.parOff[0]); by += (1 - d.parallax[1] / 100) * (cam.y - d.parOff[1]); }
-      if (Math.abs(bx - cam.x) > R * 3 && !d.parallax) continue;
-      ctx.save(); ctx.globalAlpha = clamp(op, 0, 1);
+      if (d.parallax) { bx += (d.parallax[0] / 100) * (cam.x - d.parOff[0]); by += (d.parallax[1] / 100) * (cam.y - d.parOff[1]); }
+      if (d.obj && (Math.abs(bx - cam.x) > vis + 3 || Math.abs(by - cam.y) > vis + 3)) continue;
+      ctx.save(); ctx.globalAlpha = clamp(alpha, 0, 1);
       ctx.translate(bx, by);
       if (d.rel === "Camera" || d.rel === "CameraAspect") ctx.rotate(-cam.rot * D2R);
       const r = d.rot + eng.drot[di]; if (r) ctx.rotate(r * D2R);
       const sx = eng.dsx[di], sy = eng.dsy[di];
-      if (d.text) {
+      if (d.obj === "floor") {
+        ctx.scale(sx, sy); ctx.lineJoin = "miter"; ctx.lineCap = "butt";
+        const h = 0.465, a2 = d.angle * D2R;
+        strokeShape(h, 0, d.tmid ? h : Math.cos(a2) * h, d.tmid ? 0 : Math.sin(a2) * h, eng.dstyle[di], eng.dcol[di], d.tmid);
+      } else if (d.obj === "planet") {
+        drawPlanetAt(0, 0, eng.dpcol[di], Math.max(sx, sy), 1);
+      } else if (d.text) {
         const k = 0.008;
         ctx.scale(sx * k, -sy * k); ctx.font = "100px 'Noto Sans KR', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = css(d.color);
         ctx.fillText(d.str, -d.pivot[0] * 100, d.pivot[1] * 100);
@@ -602,7 +696,7 @@
         shx += amp * (Math.sin(ph * 2.3) + 0.5 * Math.sin(ph * 5.1)); shy += amp * (Math.cos(ph * 1.7) + 0.5 * Math.cos(ph * 4.3));
       }
     }
-    const ppt = ((H / 12) * cam.zoom * viewScale) / 100;
+    const ppt = ((H / 10) * 100 * viewScale) / Math.max(5, cam.zoom);
     drawBgImage(bgs, cam, W, H, ppt);
     ctx.translate(W / 2, H / 2);
     ctx.rotate(cam.rot * D2R);
@@ -610,21 +704,22 @@
     ctx.translate(-(cam.x + shx), -(cam.y + shy));
     ctx.lineCap = "butt"; ctx.lineJoin = "miter"; ctx.miterLimit = 2.2;
 
-    drawDecors(L.decBack, cam, shx, shy);
+    drawDecors(L.decBack, cam, (0.5 * Math.hypot(W, H)) / ppt);
     const R = (0.5 * Math.hypot(W, H)) / ppt + 3;
     const cx = cam.x + shx, cy = cam.y + shy;
-    const animated = L.appear || L.disappear;
+    const an = (() => { const k = lastLE(L.animEv, T, (e) => e.t); return k < 0 ? L.animBase : L.animEv[k].state; })();
+    const animated = an.appear || an.disappear;
     for (let i = 0; i < L.n; i++) {
       const x = L.X[i] + eng.dx[i], y = L.Y[i] + eng.dy[i];
       if (Math.abs(x - cx) > R || Math.abs(y - cy) > R) continue;
       let al = eng.op[i], sc = 1;
       if (al <= 0.002) continue;
-      if (animated) { const lk = tileLook(i, T); if (!lk) continue; al *= lk[0]; sc = lk[1]; }
+      if (animated) { const lk = tileLook(i, T, an); if (!lk) continue; al *= lk[0]; sc = lk[1]; }
       drawTile(i, al, sc, eng.cm[i], tileColor(i));
     }
     ctx.globalAlpha = 1;
 
-    drawDecors(L.decFront, cam, shx, shy);
+    drawDecors(L.decFront, cam, (0.5 * Math.hypot(W, H)) / ppt);
     // 공
     const ps = planetState(T);
     const pi = ps.i, a = ps.ang * D2R;
@@ -633,19 +728,15 @@
     let ox = 0, oy = 0;
     if (!ps.last) {
       const span = L.T[pi + 1] - L.T[pi], p = span > 0 ? clamp((T - L.T[pi]) / span, 0, 1) : 1;
-      ox = (eng.dx[nxt] - eng.dx[pi]) * p; oy = (eng.dy[nxt] - eng.dy[pi]) * p;
+      ox = (eng.dx[nxt] - eng.dx[pi] + L.SHX[pi]) * p; oy = (eng.dy[nxt] - eng.dy[pi] + L.SHY[pi]) * p;
     }
-    const mx = pvx + Math.cos(a) + ox, my = pvy + Math.sin(a) + oy;
-    ctx.lineWidth = 0.025; ctx.strokeStyle = "rgba(255,255,255,.12)"; ctx.beginPath(); ctx.arc(pvx, pvy, 1, 0, Math.PI * 2); ctx.stroke();
+    const sc = (list, d) => { const k = lastLE(list, T, (e) => e.t); return k < 0 ? d : list[k].v; };
+    const RR = sc(L.rScale, 100) / 100, PS = sc(L.pScale, 100) / 100;
+    const mx = pvx + Math.cos(a) * RR + ox, my = pvy + Math.sin(a) * RR + oy;
+    ctx.lineWidth = 0.025; ctx.strokeStyle = "rgba(255,255,255,.12)"; ctx.beginPath(); ctx.arc(pvx, pvy, Math.abs(RR), 0, Math.PI * 2); ctx.stroke();
     const pivotCol = pi % 2 === 0 ? RED : BLUE, moveCol = pi % 2 === 0 ? BLUE : RED;
-    const planet = (x, y, c) => {
-      const g = ctx.createRadialGradient(x, y, 0, x, y, 0.42);
-      g.addColorStop(0, c + "aa"); g.addColorStop(1, c + "00");
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 0.42, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = c; ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.lineWidth = 0.045;
-      ctx.beginPath(); ctx.arc(x, y, 0.17, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    };
-    planet(pvx, pvy, pivotCol); planet(mx, my, moveCol);
+    const rgb = (h) => ({ r: parseInt(h.slice(1, 3), 16), g: parseInt(h.slice(3, 5), 16), b: parseInt(h.slice(5, 7), 16) });
+    if (PS > 0.01) { drawPlanetAt(pvx, pvy, rgb(pivotCol), PS, 1); drawPlanetAt(mx, my, rgb(moveCol), PS, 1); }
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     overlayFlash("Foreground", T, W, H);
