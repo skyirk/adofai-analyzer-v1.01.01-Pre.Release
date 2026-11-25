@@ -369,7 +369,7 @@
   /* ---------- 상태 ---------- */
   const cv = $("#cv"), ctx = cv.getContext("2d");
   const small = document.createElement("canvas"), sctx = small.getContext("2d");
-  let infoArgs = null, L = null, eng = null, T = 0, playing = false, rate = 1, offsetMs = 0, hitOn = false, audio = null, audioUrl = null, lastTs = 0, lastIdx = 0;
+  let viewScale = 1, infoArgs = null, L = null, eng = null, T = 0, playing = false, rate = 1, offsetMs = 0, hitOn = false, audio = null, audioUrl = null, lastTs = 0, lastIdx = 0;
   let pitch = 1, lastFilter = "", ac = null, vol = 0.6;
   const RED = "#ff4d4d", BLUE = "#4d8dff";
 
@@ -602,7 +602,7 @@
         shx += amp * (Math.sin(ph * 2.3) + 0.5 * Math.sin(ph * 5.1)); shy += amp * (Math.cos(ph * 1.7) + 0.5 * Math.cos(ph * 4.3));
       }
     }
-    const ppt = ((H / 10) * cam.zoom) / 100;
+    const ppt = ((H / 12) * cam.zoom * viewScale) / 100;
     drawBgImage(bgs, cam, W, H, ppt);
     ctx.translate(W / 2, H / 2);
     ctx.rotate(cam.rot * D2R);
@@ -692,7 +692,7 @@
   /* ---------- 재생 제어 ---------- */
   const el = {
     play: $("#c-play"), seek: $("#c-seek"), time: $("#c-time"), rate: $("#c-rate"), hit: $("#c-hit"), vol: $("#c-vol"), off: $("#c-off"),
-    fs: $("#c-fs"), empty: $("#empty"), info: $("#info"), infoBody: $("#info-body"), infoBtn: $("#c-info"), title: $("#hud-title"), msg: $("#pmsg"),
+    fs: $("#c-fs"), zoom: $("#c-zoom"), empty: $("#empty"), info: $("#info"), infoBody: $("#info-body"), infoBtn: $("#c-info"), title: $("#hud-title"), msg: $("#pmsg"),
   };
   const fmt = (s) => { const neg = s < 0; s = Math.abs(s); const m = Math.floor(s / 60), r = s - m * 60; return (neg ? "-" : "") + m + ":" + r.toFixed(2).padStart(5, "0"); };
   function say(t, bad) { el.msg.textContent = t || ""; el.msg.className = "pmsg" + (bad ? " bad" : ""); }
@@ -746,7 +746,7 @@
     el.seek.min = -L.pre; el.seek.max = L.end; el.seek.step = 0.01;
     T = -L.pre; eng.seek(T); lastIdx = 0; playing = false; el.play.textContent = "재생";
     el.empty.classList.add("hidden");
-    ["c-play", "c-seek", "c-rate", "c-hit", "c-vol", "c-off", "c-info", "c-fs"].forEach((id) => ($("#" + id).disabled = false));
+    ["c-zoom", "c-play", "c-seek", "c-rate", "c-hit", "c-vol", "c-off", "c-info", "c-fs"].forEach((id) => ($("#" + id).disabled = false));
     const title = [L.S.artist, L.S.song].filter(Boolean).join(" - ") || name;
     el.title.textContent = title; document.title = title + " · 맵 테스트";
     infoArgs = [L, obj, name]; renderInfo(L, obj, name);
@@ -838,6 +838,8 @@
     else if (e.code === "ArrowRight") { e.preventDefault(); seekTo(T + (e.shiftKey ? 1 : 5)); }
     else if (e.code === "Home") seekTo(-L.pre);
   });
+  el.zoom.addEventListener("input", () => { viewScale = Number(el.zoom.value) / 100; });
+  cv.addEventListener("wheel", (e) => { e.preventDefault(); viewScale = clamp(viewScale * (e.deltaY > 0 ? 0.92 : 1.08), 0.2, 2); el.zoom.value = Math.round(viewScale * 100); }, { passive: false });
   el.vol.value = vol;
   window.addEventListener("resize", resize);
   requestAnimationFrame(loop);
