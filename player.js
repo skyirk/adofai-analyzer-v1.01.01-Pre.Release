@@ -70,7 +70,7 @@
   }
 
   /* ---------- 지원 이벤트 ---------- */
-  const SUPPORTED = new Set(["SetSpeed", "Twirl", "Pause", "Hold", "MoveCamera", "MoveTrack", "PositionTrack", "ColorTrack", "RecolorTrack", "Flash", "SetFilter", "Bloom", "ShakeScreen", "CustomBackground"]);
+  const SUPPORTED = new Set(["SetSpeed", "Twirl", "Pause", "Hold", "MoveCamera", "MoveTrack", "PositionTrack", "ColorTrack", "RecolorTrack", "Flash", "SetFilter", "Bloom", "ShakeScreen", "CustomBackground", "MoveDecorations", "AddDecoration", "AddText"]);
   const HARMLESS = new Set(["EditorComment", "Bookmark", "SetHitsound", "Checkpoint", "SetPlanetRotation", "AnimateTrack", "SetFrameRate", "SetFloorIcon", "ScaleMargin", "ScaleRadius", "ScalePlanets"]);
   const FILTER_CSS = {
     Grayscale: (i) => `grayscale(${i}%)`, Sepia: (i) => `sepia(${i}%)`, Invert: (i) => `invert(${i}%)`,
@@ -225,8 +225,40 @@
       filtStates.push(fs);
     }
     const bloomStates = bloomEv.map((b) => ({ on: bool(b.ev.enabled, true), intensity: Number(b.ev.intensity ?? 100), threshold: Number(b.ev.threshold ?? 50), color: hex(b.ev.color, hex("ffffff")) }));
-    const bgBase = hex(S.backgroundColor, hex("000000"));
-    const bgStates = bgEv.map((b) => hex(b.ev.color, null) || bgBase);
+    const par2 = (v) => (Array.isArray(v) ? [Number(v[0]) || 0, Number(v[1]) || 0] : [100, 100]);
+    const bgBase = { color: hex(S.backgroundColor, hex("000000")), img: S.bgImage || "", imgColor: hex(S.bgImageColor, hex("ffffff")), mode: S.bgDisplayMode || "FitToScreen", parallax: par2(S.parallax), loop: bool(S.loopBG) };
+    let pb = bgBase;
+    const bgStates = bgEv.map((b) => {
+      const e = b.ev;
+      pb = { color: hex(e.color, null) || pb.color, img: e.bgImage !== undefined ? e.bgImage : pb.img, imgColor: hex(e.imageColor, null) || pb.imgColor, mode: e.bgDisplayMode || pb.mode, parallax: e.parallax ? par2(e.parallax) : pb.parallax, loop: e.loopBG !== undefined ? bool(e.loopBG) : pb.loop };
+      return pb;
+    });
+
+    // 데코레이션
+    const decos = [], fromActions = new Set(actions);
+    const decSrc = (Array.isArray(m.decorations) ? m.decorations : []).concat(actions.filter((a) => a.eventType === "AddDecoration" || a.eventType === "AddText"));
+    const v2 = (v, d) => (Array.isArray(v) ? [Number(v[0]), Number(v[1])] .map((x, k) => (Number.isFinite(x) ? x : d[k])) : d);
+    for (const d of decSrc) {
+      if (d.eventType !== "AddDecoration" && d.eventType !== "AddText") continue;
+      if (!fromActions.has(d)) typeCount[d.eventType] = (typeCount[d.eventType] || 0) + 1;
+      const par = Array.isArray(d.parallax) && d.parallax[0] >= 0 ? v2(d.parallax, [100, 100]) : null;
+      decos.push({
+        text: d.eventType === "AddText", img: d.decorationImage || "", str: String(d.decText || "").replace(/<[^>]*>/g, ""),
+        pos: v2(d.position, [0, 0]), rel: d.relativeTo || "Tile", floor: clamp(d.floor | 0, 0, n - 1), pivot: v2(d.pivotOffset, [0, 0]), rot: Number(d.rotation) || 0,
+        sc: v2(d.scale, [100, 100]), color: hex(d.color, hex("ffffff")), op: Number(d.opacity ?? 100) / 100, depth: Number(d.depth ?? -1),
+        parallax: par, parOff: v2(d.parallaxOffset, [0, 0]), tags: String(d.tag || "").split(/\s+/).filter(Boolean), visible: d.visible === undefined ? true : bool(d.visible, true),
+      });
+    }
+    const tagMap = {};
+    decos.forEach((d, i) => d.tags.forEach((t) => (tagMap[t] = tagMap[t] || []).push(i)));
+    for (const ev of actions) {
+      if (ev.eventType !== "MoveDecorations" || !((ev.floor | 0) >= 0 && (ev.floor | 0) < n)) continue;
+      const idx = [...new Set(String(ev.tag || "").split(/\s+/).flatMap((t) => tagMap[t] || []))];
+      if (idx.length) timed.push({ t: evT(ev), dur: evDur(ev), kind: "decmove", ev, idx, ease: easeFn(ev.ease) });
+    }
+    timed.sort(byT);
+    const decBack = decos.map((_, i) => i).filter((i) => decos[i].depth > 0).sort((a, b) => decos[b].depth - decos[a].depth);
+    const decFront = decos.map((_, i) => i).filter((i) => decos[i].depth <= 0).sort((a, b) => decos[b].depth - decos[a].depth);
 
     // 트랙 등장/퇴장
     const appear = S.trackAnimation && S.trackAnimation !== "None" ? S.trackAnimation : null;
@@ -240,15 +272,15 @@
       if (SUPPORTED.has(k)) supported[k] = typeCount[k];
       else if (!HARMLESS.has(k)) unsupported[k] = typeCount[k];
     }
-    const decoCount = Array.isArray(m.decorations) ? m.decorations.length : 0;
+    const decoCount = 0;
 
     return {
       S, n, X, Y, eff, mid, aIn, aOut, T, bpmAt, cw, delta, waitT, rotT, byFloor,
       col1, col2, colMode, tstyle, base, timed, cams, initCam, flashes, shakes,
-      filtEv, filtStates, bloomEv, bloomStates, bgEv, bgStates, bgBase, appear, disappear, ahead, behind,
+      filtEv, filtStates, bloomEv, bloomStates, bgEv, bgStates, bgBase, decos, decBack, decFront, appear, disappear, ahead, behind,
       pre: (Number(S.countdownTicks ?? 4) || 0) * (60 / (Number(S.bpm) > 0 ? Number(S.bpm) : bpmAt[0])),
       end: T[n - 1] + 2 * (60 / bpmAt[n - 1]),
-      info: { tiles: n, bpmMin: Math.min(...bpms), bpmMax: Math.max(...bpms), supported, unsupported, decoCount, unsupportedFilters: [...unsupportedFilters], duration: T[n - 1] },
+      info: { images: [...new Set(decos.map((d) => d.img).concat(bgBase.img, bgStates.map((b) => b.img)).filter(Boolean))], tiles: n, bpmMin: Math.min(...bpms), bpmMax: Math.max(...bpms), supported, unsupported, decoCount, unsupportedFilters: [...unsupportedFilters], duration: T[n - 1] },
     };
   }
 
@@ -260,6 +292,8 @@
       this.dx = Float32Array.from(b.dx); this.dy = Float32Array.from(b.dy); this.rot = Float32Array.from(b.rot);
       this.sx = Float32Array.from(b.sx); this.sy = Float32Array.from(b.sy); this.op = Float32Array.from(b.op);
       this.c1 = this.L.col1.slice(); this.c2 = this.L.col2.slice(); this.cm = this.L.colMode.slice();
+      this.dpx = new Float32Array(this.L.decos.length); this.dpy = new Float32Array(this.L.decos.length); this.drot = new Float32Array(this.L.decos.length);
+      this.dsx = Float32Array.from(this.L.decos, (d) => d.sc[0] / 100); this.dsy = Float32Array.from(this.L.decos, (d) => d.sc[1] / 100); this.dop = Float32Array.from(this.L.decos, (d) => d.op);
       this.ptr = 0; this.active = []; this.last = -Infinity; this.n = n;
     }
     start(it) {
@@ -270,6 +304,16 @@
           if (e.secondaryTrackColor) this.c2[i] = hex(e.secondaryTrackColor, this.c2[i]);
           if (e.trackColorType) this.cm[i] = e.trackColorType;
         }
+        return;
+      }
+      if (it.kind === "decmove") {
+        const e = it.ev, tw = { t0: it.t, dur: it.dur, idx: it.idx, ease: it.ease, props: [] };
+        const addD = (arr, target, rel) => { if (typeof target === "number" && !Number.isNaN(target)) tw.props.push({ arr, target, rel, s: Float32Array.from(it.idx, (i) => arr[i]) }); };
+        const po = e.positionOffset; if (Array.isArray(po)) { addD(this.dpx, po[0]); addD(this.dpy, po[1]); }
+        addD(this.drot, e.rotationOffset, true);
+        if (Array.isArray(e.scale)) { addD(this.dsx, e.scale[0] / 100); addD(this.dsy, e.scale[1] / 100); } else addD(this.dsx, e.scale / 100) , addD(this.dsy, e.scale / 100);
+        addD(this.dop, e.opacity / 100);
+        if (tw.props.length) this.active.push(tw);
         return;
       }
       const e = it.ev, a = Math.min(it.a, it.b), b = Math.max(it.a, it.b), cnt = b - a + 1;
@@ -287,7 +331,8 @@
       for (let k = this.active.length - 1; k >= 0; k--) {
         const tw = this.active[k];
         const p = tw.dur > 0 ? clamp((t - tw.t0) / tw.dur, 0, 1) : 1, e = tw.ease(p);
-        for (const pr of tw.props) for (let i = tw.a; i <= tw.b; i++) pr.arr[i] = pr.s[i - tw.a] + (pr.target - pr.s[i - tw.a]) * e;
+        if (tw.idx) { for (const pr of tw.props) for (let k = 0; k < tw.idx.length; k++) pr.arr[tw.idx[k]] = pr.s[k] + ((pr.rel ? pr.s[k] + pr.target : pr.target) - pr.s[k]) * e; }
+        else for (const pr of tw.props) for (let i = tw.a; i <= tw.b; i++) pr.arr[i] = pr.s[i - tw.a] + (pr.target - pr.s[i - tw.a]) * e;
         if (p >= 1) this.active.splice(k, 1);
       }
     }
@@ -324,7 +369,7 @@
   /* ---------- 상태 ---------- */
   const cv = $("#cv"), ctx = cv.getContext("2d");
   const small = document.createElement("canvas"), sctx = small.getContext("2d");
-  let L = null, eng = null, T = 0, playing = false, rate = 1, offsetMs = 0, hitOn = false, audio = null, audioUrl = null, lastTs = 0, lastIdx = 0;
+  let infoArgs = null, L = null, eng = null, T = 0, playing = false, rate = 1, offsetMs = 0, hitOn = false, audio = null, audioUrl = null, lastTs = 0, lastIdx = 0;
   let pitch = 1, lastFilter = "", ac = null, vol = 0.6;
   const RED = "#ff4d4d", BLUE = "#4d8dff";
 
@@ -405,6 +450,14 @@
     if (sx !== 1 || sy !== 1) ctx.scale(sx, sy);
     ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(0, 0); ctx.lineTo(qx, qy);
     ctx.globalAlpha = al;
+    if (L.mid[i]) {
+      // 미드스핀: 한쪽만 이어진 짧은 타일 + 마름모 표식
+      ctx.beginPath(); ctx.moveTo(px * 0.7, py * 0.7); ctx.lineTo(0, 0);
+      ctx.lineWidth = 0.9; ctx.strokeStyle = css(mix(color, { r: 255, g: 255, b: 255 }, 0.6), 0.9); ctx.stroke();
+      ctx.lineWidth = 0.7; ctx.strokeStyle = css(mix(color, { r: 255, g: 255, b: 255 }, 0.25)); ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.beginPath(); ctx.moveTo(0, 0.16); ctx.lineTo(0.16, 0); ctx.lineTo(0, -0.16); ctx.lineTo(-0.16, 0); ctx.closePath(); ctx.fill();
+      ctx.restore(); return;
+    }
     const style = L.tstyle[i];
     if (style === "Basic" || style === "Minimal") {
       ctx.lineWidth = 0.8; ctx.strokeStyle = css(color); ctx.stroke();
@@ -426,6 +479,83 @@
   function hslHex(h) {
     const f = (n) => { const k = (n + h / 30) % 12; const v = 0.5 - 0.25 * Math.max(-1, Math.min(k - 3, 9 - k, 1)); return Math.round(v * 255).toString(16).padStart(2, "0"); };
     return f(0) + f(8) + f(4);
+  }
+
+  /* ---------- 에셋(이미지) ---------- */
+  const assets = new Map(), imgCache = new Map();
+  const normKey = (p) => String(p || "").replace(/\\/g, "/").toLowerCase();
+  function addAsset(file) {
+    const rel = normKey(file.webkitRelativePath || file.name), base = rel.split("/").pop();
+    const parts = rel.split("/"); for (let i = 0; i < parts.length; i++) assets.set(parts.slice(i).join("/"), file);
+    assets.set(base, assets.get(base) || file);
+    for (const k of [...imgCache.keys()]) if (!imgCache.get(k).ok) imgCache.delete(k);
+  }
+  function assetImg(name) {
+    if (!name) return null;
+    const key = normKey(name);
+    let c = imgCache.get(key);
+    if (c) return c.ok ? c.img : null;
+    const f = assets.get(key) || assets.get(key.split("/").pop());
+    if (!f) return null;
+    const img = new Image(); c = { img, ok: false };
+    img.onload = () => { c.ok = true; };
+    img.onerror = () => { c.err = true; };
+    img.src = URL.createObjectURL(f);
+    imgCache.set(key, c);
+    return null;
+  }
+  function drawBgImage(bg, cam, W, H, ppt) {
+    const img = assetImg(bg.img); if (!img) return;
+    ctx.save(); ctx.globalAlpha = bg.imgColor.a;
+    const px = bg.parallax[0] / 100, py = bg.parallax[1] / 100;
+    const ox = -cam.x * ppt * (1 - px) * 0.0 + 0, oy = 0;
+    if (bg.mode === "Tiled" || bg.loop) {
+      const w = img.width * (ppt / 100), h = img.height * (ppt / 100);
+      if (w > 4 && h > 4) {
+        const sx = mod(-(cam.x * ppt * (1 - px)) + W / 2 - w / 2, w) - w, sy = mod((cam.y * ppt * (1 - py)) + H / 2 - h / 2, h) - h;
+        for (let x = sx; x < W; x += w) for (let y = sy; y < H; y += h) ctx.drawImage(img, x, y, w, h);
+      }
+    } else if (bg.mode === "Unscaled") {
+      const w = img.width * (ppt / 100), h = img.height * (ppt / 100);
+      ctx.drawImage(img, W / 2 - w / 2 + ox, H / 2 - h / 2 + oy, w, h);
+    } else {
+      const k = Math.max(W / img.width, H / img.height), w = img.width * k, h = img.height * k;
+      ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+    }
+    ctx.restore();
+  }
+  function drawDecors(list, cam, shx, shy) {
+    if (!list.length) return;
+    const R = 40 / Math.max(0.1, cam.zoom / 100);
+    for (const di of list) {
+      const d = L.decos[di];
+      if (!d.visible) continue;
+      const op = eng.dop[di]; if (op <= 0.003) continue;
+      let bx, by;
+      if (d.rel === "Global") { bx = d.pos[0]; by = d.pos[1]; }
+      else if (d.rel === "Camera" || d.rel === "CameraAspect") { bx = cam.x + d.pos[0]; by = cam.y + d.pos[1]; }
+      else { bx = L.X[d.floor] + d.pos[0]; by = L.Y[d.floor] + d.pos[1]; }
+      bx += eng.dpx[di]; by += eng.dpy[di];
+      if (d.parallax) { bx += (1 - d.parallax[0] / 100) * (cam.x - d.parOff[0]); by += (1 - d.parallax[1] / 100) * (cam.y - d.parOff[1]); }
+      if (Math.abs(bx - cam.x) > R * 3 && !d.parallax) continue;
+      ctx.save(); ctx.globalAlpha = clamp(op, 0, 1);
+      ctx.translate(bx, by);
+      if (d.rel === "Camera" || d.rel === "CameraAspect") ctx.rotate(-cam.rot * D2R);
+      const r = d.rot + eng.drot[di]; if (r) ctx.rotate(r * D2R);
+      const sx = eng.dsx[di], sy = eng.dsy[di];
+      if (d.text) {
+        const k = 0.008;
+        ctx.scale(sx * k, -sy * k); ctx.font = "100px 'Noto Sans KR', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = css(d.color);
+        ctx.fillText(d.str, -d.pivot[0] * 100, d.pivot[1] * 100);
+      } else {
+        const img = assetImg(d.img);
+        if (img) {
+          const w = img.width / 100, h = img.height / 100;
+          ctx.scale(sx, -sy); ctx.drawImage(img, -w / 2 - d.pivot[0], -h / 2 + d.pivot[1], w, h);
+        }
+      }
+      ctx.restore();
+    }
   }
 
   function planetState(t) {
@@ -452,7 +582,8 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     const kb = lastLE(L.bgEv, T, (b) => b.t);
-    ctx.fillStyle = css(kb >= 0 ? L.bgStates[kb] : L.bgBase);
+    const bgs = kb >= 0 ? L.bgStates[kb] : L.bgBase;
+    ctx.fillStyle = css(bgs.color);
     ctx.fillRect(0, 0, W, H);
     overlayFlash("Background", T, W, H);
 
@@ -472,12 +603,14 @@
       }
     }
     const ppt = ((H / 10) * cam.zoom) / 100;
+    drawBgImage(bgs, cam, W, H, ppt);
     ctx.translate(W / 2, H / 2);
     ctx.rotate(cam.rot * D2R);
     ctx.scale(ppt, -ppt);
     ctx.translate(-(cam.x + shx), -(cam.y + shy));
-    ctx.lineCap = "butt"; ctx.lineJoin = "round";
+    ctx.lineCap = "butt"; ctx.lineJoin = "miter"; ctx.miterLimit = 2.2;
 
+    drawDecors(L.decBack, cam, shx, shy);
     const R = (0.5 * Math.hypot(W, H)) / ppt + 3;
     const cx = cam.x + shx, cy = cam.y + shy;
     const animated = L.appear || L.disappear;
@@ -491,6 +624,7 @@
     }
     ctx.globalAlpha = 1;
 
+    drawDecors(L.decFront, cam, shx, shy);
     // 공
     const ps = planetState(T);
     const pi = ps.i, a = ps.ang * D2R;
@@ -615,7 +749,7 @@
     ["c-play", "c-seek", "c-rate", "c-hit", "c-vol", "c-off", "c-info", "c-fs"].forEach((id) => ($("#" + id).disabled = false));
     const title = [L.S.artist, L.S.song].filter(Boolean).join(" - ") || name;
     el.title.textContent = title; document.title = title + " · 맵 테스트";
-    renderInfo(L, obj, name);
+    infoArgs = [L, obj, name]; renderInfo(L, obj, name);
     say(`불러왔습니다 · 타일 ${L.n.toLocaleString()}개. 음악 파일을 같이 불러오면 소리가 재생됩니다.`);
   }
   function renderInfo(Lv, obj, name) {
@@ -627,7 +761,10 @@
     h += `<h3>적용되는 이벤트</h3><div class="chips">${list(I.supported) || "<em>없음</em>"}</div>`;
     const un = list(I.unsupported);
     h += `<h3>적용되지 않는 이벤트</h3><div class="chips off">${un || "<em>없음</em>"}</div>`;
-    if (I.decoCount) h += `<p class="note">데코레이션 ${I.decoCount.toLocaleString()}개는 표시하지 않습니다.</p>`;
+    if (I.images.length) {
+      const miss = I.images.filter((n) => !assets.has(normKey(n)) && !assets.has(normKey(n).split("/").pop()));
+      h += miss.length ? `<p class="note">이미지 ${miss.length}/${I.images.length}개가 없어 표시되지 않습니다. 맵 폴더째로 불러와 주세요.<br>${miss.slice(0, 6).map(esc).join(", ")}${miss.length > 6 ? " …" : ""}</p>` : `<p class="note">이미지 ${I.images.length}개 모두 불러왔습니다.</p>`;
+    }
     if (I.unsupportedFilters.length) h += `<p class="note">미적용 필터: ${I.unsupportedFilters.map(esc).join(", ")}</p>`;
     el.infoBody.innerHTML = h;
   }
@@ -641,21 +778,46 @@
     syncAudio();
   }
   const isAudio = (f) => /^audio\//.test(f.type) || /\.(mp3|ogg|wav|m4a|flac|aac|opus|oga)$/i.test(f.name);
+  const isImage = (f) => /^image\//.test(f.type) || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(f.name);
   const isMap = (f) => /\.(adofai|json|txt)$/i.test(f.name);
-  function takeFiles(files) {
-    for (const f of files) {
-      if (isAudio(f)) loadAudio(f);
-      else if (isMap(f)) { if (f.size > 60 * 1024 * 1024) { say("파일이 너무 큽니다 (60MB 이하).", true); continue; } f.text().then((t) => loadMap(t, f.name)); }
-      else say("지원하지 않는 파일입니다: " + f.name, true);
+  function takeFiles(list) {
+    const files = [...list];
+    const imgs = files.filter(isImage), audios = files.filter(isAudio), maps = files.filter((f) => /\.adofai$/i.test(f.name) || (isMap(f) && files.length === 1));
+    imgs.forEach(addAsset);
+    if (imgs.length) say(`이미지 ${imgs.length}개를 불러왔습니다.`);
+    if (audios.length) loadAudio(audios.sort((a, b) => b.size - a.size)[0]);
+    if (maps.length) {
+      const pick = maps.find((f) => /main\.adofai$/i.test(f.name)) || maps[0];
+      if (pick.size > 60 * 1024 * 1024) { say("파일이 너무 큽니다 (60MB 이하).", true); return; }
+      pick.text().then((t) => { loadMap(t, pick.name); if (imgs.length) say(`불러왔습니다 · 타일 ${L ? L.n.toLocaleString() : 0}개 · 이미지 ${imgs.length}개` + (maps.length > 1 ? ` · .adofai ${maps.length}개 중 ${pick.name} 선택` : "")); });
+    } else if (infoArgs) renderInfo(...infoArgs);
+    if (!imgs.length && !audios.length && !maps.length) say("지원하지 않는 파일입니다.", true);
+  }
+  async function walkEntries(entries) {
+    const out = [];
+    async function walk(en, path) {
+      if (en.isFile) await new Promise((res) => en.file((f) => { try { Object.defineProperty(f, "webkitRelativePath", { value: path + f.name }); } catch (e) { /* 무시 */ } out.push(f); res(); }, () => res()));
+      else if (en.isDirectory) {
+        const rd = en.createReader(); let batch;
+        do { batch = await new Promise((res) => rd.readEntries(res, () => res([]))); for (const c of batch) await walk(c, path + en.name + "/"); } while (batch.length);
+      }
     }
+    for (const en of entries) await walk(en, "");
+    return out;
   }
 
   /* ---------- 이벤트 연결 ---------- */
   $("#f-map").addEventListener("change", (e) => { takeFiles(e.target.files); e.target.value = ""; });
+  $("#f-dir").addEventListener("change", (e) => { takeFiles(e.target.files); e.target.value = ""; });
   $("#f-audio").addEventListener("change", (e) => { takeFiles(e.target.files); e.target.value = ""; });
   ["dragover", "dragenter"].forEach((ev) => window.addEventListener(ev, (e) => { e.preventDefault(); document.body.classList.add("drag"); }));
   ["dragleave", "drop"].forEach((ev) => window.addEventListener(ev, (e) => { e.preventDefault(); if (ev === "drop" || e.target === document.documentElement || !e.relatedTarget) document.body.classList.remove("drag"); }));
-  window.addEventListener("drop", (e) => { if (e.dataTransfer && e.dataTransfer.files.length) takeFiles(e.dataTransfer.files); });
+  window.addEventListener("drop", (e) => {
+    const dt = e.dataTransfer; if (!dt) return;
+    const ents = dt.items ? [...dt.items].map((i) => (i.webkitGetAsEntry ? i.webkitGetAsEntry() : null)).filter(Boolean) : [];
+    if (ents.some((x) => x.isDirectory)) { say("폴더를 읽는 중…"); walkEntries(ents).then(takeFiles); }
+    else if (dt.files.length) takeFiles(dt.files);
+  });
   el.play.addEventListener("click", () => setPlaying(!playing));
   el.seek.addEventListener("input", () => seekTo(Number(el.seek.value)));
   el.rate.addEventListener("change", () => { rate = Number(el.rate.value) || 1; syncAudio(); });
