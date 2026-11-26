@@ -435,7 +435,7 @@
     seek(t) {
       this.reset();
       const span = t - Math.min(0, this.L.timed.length ? this.L.timed[0].t : 0);
-      const step = span > 300 ? 0.25 : 0.1;
+      const step = span > 120 ? 0.25 : span > 30 ? 0.15 : 0.1;
       const first = this.L.timed.length ? this.L.timed[0].t : t;
       for (let x = first; x < t; x += step) this.advance(x);
       this.advance(t);
@@ -858,16 +858,17 @@
     playing = v; el.play.textContent = v ? "일시정지" : "재생"; el.play.setAttribute("aria-pressed", String(v));
     lastTs = 0; syncAudio();
   }
+  let pendingSeek = false;
   function seekTo(t) {
     if (!L) return;
     T = clamp(t, -L.pre, L.end);
-    eng.seek(T); lastIdx = tileIndexAt(L, T);
-    if (audio) { audio.pause(); }
-    syncAudio();
+    pendingSeek = true;            // 무거운 상태 재계산은 프레임당 한 번만 (슬라이더를 끌 때 버벅임 방지)
+    if (audio) audio.pause();
   }
   function loop(ts) {
     requestAnimationFrame(loop);
     if (!L) return;
+    if (pendingSeek) { pendingSeek = false; eng.seek(T); lastIdx = tileIndexAt(L, T); syncAudio(); }
     if (playing) {
       if (lastTs) T += Math.min(0.1, (ts - lastTs) / 1000) * rate * pitch;
       lastTs = ts;
@@ -895,7 +896,7 @@
     const title = [L.S.artist, L.S.song].filter(Boolean).join(" - ") || name;
     el.title.textContent = title; document.title = title + " · 맵 테스트";
     infoArgs = [L, obj, name]; renderInfo(L, obj, name);
-    say(`불러왔습니다 · 타일 ${L.n.toLocaleString()}개. 음악 파일을 같이 불러오면 소리가 재생됩니다.`);
+    say(`불러왔습니다 · 타일 ${L.n.toLocaleString()}개.` + (audio ? " 음악도 불러왔습니다." : " 음악 파일을 같이 불러오면 소리가 재생됩니다."));
   }
   function renderInfo(Lv, obj, name) {
     const I = Lv.info, S = Lv.S, esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -925,8 +926,52 @@
   const isAudio = (f) => /^audio\//.test(f.type) || /\.(mp3|ogg|wav|m4a|flac|aac|opus|oga)$/i.test(f.name);
   const isImage = (f) => /^image\//.test(f.type) || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(f.name);
   const isMap = (f) => /\.(adofai|json|txt)$/i.test(f.name);
+  /* ---------- ZIP (외부 라이브러리 없이 브라우저 내장 압축 해제 사용) ---------- */
+  const dec = (bytes, flag) => {
+    try { return new TextDecoder("utf-8", { fatal: true }).decode(bytes); } catch (e) { /* utf-8 아님 */ }
+    try { return new TextDecoder("euc-kr").decode(bytes); } catch (e) { return new TextDecoder().decode(bytes); }
+  };
+  async function inflateRaw(bytes) {
+    const ds = new DecompressionStream("deflate-raw");
+    const stream = new Blob([bytes]).stream().pipeThrough(ds);
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+  async function unzip(file) {
+    const buf = new Uint8Array(await file.arrayBuffer()), dv = new DataView(buf.buffer);
+    let e = -1;
+    for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { e = i; break; }
+    if (e < 0) throw new Error("zip 파일 구조를 찾지 못했습니다.");
+    const count = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true);
+    if (count === 0xffff || p === 0xffffffff) throw new Error("zip64 형식은 지원하지 않습니다. 폴더로 풀어서 불러와 주세요.");
+    const out = [];
+    for (let k = 0; k < count; k++) {
+      if (dv.getUint32(p, true) !== 0x02014b50) break;
+      const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nlen = dv.getUint16(p + 28, true), xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+      const name = dec(buf.subarray(p + 46, p + 46 + nlen));
+      p += 46 + nlen + xlen + clen;
+      if (name.endsWith("/") || /(^|\/)(__MACOSX|\.DS_Store)/.test(name)) continue;
+      const ds = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true);
+      let data = buf.subarray(ds, ds + csize);
+      if (method === 8) data = await inflateRaw(data); else if (method !== 0) continue;
+      const f = new File([data], name.split("/").pop(), { type: "" });
+      try { Object.defineProperty(f, "webkitRelativePath", { value: name }); } catch (err) { /* 무시 */ }
+      out.push(f);
+    }
+    return out;
+  }
+  async function expandZips(files) {
+    const out = [];
+    for (const f of files) {
+      if (/\.zip$/i.test(f.name)) {
+        try { say(`압축 파일을 푸는 중… (${f.name})`); out.push(...(await unzip(f))); } catch (e) { say("압축을 풀지 못했습니다: " + (e.message || e), true); }
+      } else out.push(f);
+    }
+    return out;
+  }
   function takeFiles(list) {
-    const files = [...list];
+    const raw = [...list];
+    if (raw.some((f) => /\.zip$/i.test(f.name))) { expandZips(raw).then((fs) => { if (fs.length) takeFiles(fs); }); return; }
+    const files = raw;
     const imgs = files.filter(isImage), audios = files.filter(isAudio), maps = files.filter((f) => /\.adofai$/i.test(f.name) || (isMap(f) && files.length === 1));
     imgs.forEach(addAsset);
     if (imgs.length) say(`이미지 ${imgs.length}개를 불러왔습니다.`);
