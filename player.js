@@ -285,7 +285,7 @@
       if (isPlanet) { if (d.planetColorType === "DefaultRed") pcol = hex("ff4d4d"); else if (d.planetColorType === "DefaultBlue") pcol = hex("4d8dff"); }
       decos.push({
         text: kind === "AddText", obj: isPlanet ? "planet" : isFloor ? "floor" : "", angle: Number(d.trackAngle ?? 180), tmid: d.trackType === "Midspin",
-        style: d.trackStyle || "Standard", col: hex(d.trackColor, hex("debb7b")), pcol,
+        icon: d.trackIcon || "None", style: d.trackStyle || "Standard", col: hex(d.trackColor, hex("debb7b")), pcol,
         img: d.decorationImage || "", str: String(d.decText || "").replace(/<[^>]*>/g, ""),
         pos: v2(d.position, [0, 0]), rel: d.relativeTo || "Tile", floor: clamp(d.floor | 0, 0, n - 1), pivot: v2(d.pivotOffset, [0, 0]), rot: Number(d.rotation) || 0,
         sc: v2(d.scale, [100, 100]), color: hex(d.color, hex("ffffff")), depth: Number(d.depth ?? -1),
@@ -300,9 +300,10 @@
       const ev = it.ev;
       if (ev.eventType !== "MoveDecorations" && ev.eventType !== "SetObject") continue;
       const idx = [...new Set(String(ev.tag || "").split(/\s+/).flatMap((t) => tagMap[t] || []))];
-      if (idx.length) timed.push({ t: it.t, dur: ev.eventType === "MoveDecorations" ? evDur(ev) : 0, kind: ev.eventType === "SetObject" ? "setobj" : "decmove", ev, idx, ease: easeFn(ev.ease) });
+      if (idx.length) timed.push({ t: it.t, dur: evDur(ev), kind: ev.eventType === "SetObject" ? "setobj" : "decmove", ev, idx, ease: easeFn(ev.ease) });
     }
     timed.sort(byT);
+    const hasDepthEv = items.some((it) => it.ev.eventType === "MoveDecorations" && typeof it.ev.depth === "number");
     const decBack = decos.map((_, i) => i).filter((i) => decos[i].depth > 0).sort((a, b) => decos[b].depth - decos[a].depth);
     const decFront = decos.map((_, i) => i).filter((i) => decos[i].depth <= 0).sort((a, b) => decos[b].depth - decos[a].depth);
 
@@ -327,14 +328,16 @@
     }
     const decoCount = 0;
 
-    return {
+    const out = {
       S, n, X, Y, SHX, SHY, eff, mid, aIn, aOut, T, bpmAt, cw, delta, waitT, rotT, byFloor,
       col1, col2, colMode, tstyle, base, timed, cams, initCam, flashes, shakes,
-      filtEv, filtStates, bloomEv, bloomStates, bgEv, bgStates, bgBase, decos, decBack, decFront, animBase, animEv, pScale, rScale,
+      filtEv, filtStates, bloomEv, bloomStates, bgEv, bgStates, bgBase, decos, decBack, decFront, hasDepthEv, animBase, animEv, pScale, rScale,
       pre: (Number(S.countdownTicks ?? 4) || 0) * (60 / (Number(S.bpm) > 0 ? Number(S.bpm) : bpmAt[0])),
       end: T[n - 1] + 2 * (60 / bpmAt[n - 1]),
       info: { images: [...new Set(decos.map((d) => d.img).concat(bgBase.img, bgStates.map((b) => b.img)).filter(Boolean))], tiles: n, bpmMin: Math.min(...bpms), bpmMax: Math.max(...bpms), supported, unsupported, decoCount, unsupportedFilters: [...unsupportedFilters], duration: T[n - 1] },
     };
+    computeCamSnaps(out);
+    return out;
   }
 
   /* ---------- 상태 엔진 (MoveTrack / RecolorTrack) ---------- */
@@ -348,6 +351,11 @@
       this.dpx = new Float32Array(this.L.decos.length); this.dpy = new Float32Array(this.L.decos.length); this.drot = new Float32Array(this.L.decos.length);
       this.dsx = Float32Array.from(this.L.decos, (d) => d.sc[0] / 100); this.dsy = Float32Array.from(this.L.decos, (d) => d.sc[1] / 100); this.dop = Float32Array.from(this.L.decos, (d) => d.op);
       this.dvis = Uint8Array.from(this.L.decos, (d) => (d.visible ? 1 : 0));
+      const nd = this.L.decos.length;
+      this.dpvx = Float32Array.from(this.L.decos, (d) => d.pivot[0]); this.dpvy = Float32Array.from(this.L.decos, (d) => d.pivot[1]);
+      this.dparx = Float32Array.from(this.L.decos, (d) => (d.parallax ? d.parallax[0] : 0)); this.dpary = Float32Array.from(this.L.decos, (d) => (d.parallax ? d.parallax[1] : 0));
+      this.dpox = Float32Array.from(this.L.decos, (d) => d.parOff[0]); this.dpoy = Float32Array.from(this.L.decos, (d) => d.parOff[1]);
+      this.ddepth = Float32Array.from(this.L.decos, (d) => d.depth); this.drel = this.L.decos.map((d) => d.rel); this.dicon = this.L.decos.map((d) => d.icon); this.depthVer = 0;
       this.dstyle = this.L.decos.map((d) => d.style); this.dcol = this.L.decos.map((d) => d.col); this.dpcol = this.L.decos.map((d) => d.pcol);
       this.ptr = 0; this.active = []; this.last = -Infinity; this.n = n;
     }
@@ -362,23 +370,30 @@
         return;
       }
       if (it.kind === "setobj") {
-        const e = it.ev;
-        for (const i of it.idx) {
-          if (e.trackStyle) this.dstyle[i] = e.trackStyle;
-          if (e.trackColor) this.dcol[i] = hex(e.trackColor, this.dcol[i]);
-          if (e.planetColor) this.dpcol[i] = hex(e.planetColor, this.dpcol[i]);
-          if (typeof e.trackOpacity === "number") this.dop[i] = e.trackOpacity / 100;
-        }
+        const e = it.ev, tw = { t0: it.t, dur: it.dur, idx: it.idx, ease: it.ease, props: [], cprops: [] };
+        const addC = (arr, hexv) => { const c = hex(hexv, null); if (c) tw.cprops.push({ arr, target: c, s: it.idx.map((i) => arr[i]) }); };
+        for (const i of it.idx) { if (e.trackStyle) this.dstyle[i] = e.trackStyle; if (e.trackIcon) this.dicon[i] = e.trackIcon; }
+        if (e.trackColor) addC(this.dcol, e.trackColor);
+        if (e.planetColor) addC(this.dpcol, e.planetColor);
+        if (typeof e.trackOpacity === "number") tw.props.push({ arr: this.dop, target: e.trackOpacity / 100, s: Float32Array.from(it.idx, (i) => this.dop[i]) });
+        if (tw.props.length || tw.cprops.length) this.active.push(tw);
         return;
       }
       if (it.kind === "decmove") {
-        if (typeof it.ev.visible === "boolean") for (const i of it.idx) this.dvis[i] = it.ev.visible ? 1 : 0;
-        const e = it.ev, tw = { t0: it.t, dur: it.dur, idx: it.idx, ease: it.ease, props: [] };
-        const addD = (arr, target, rel) => { if (typeof target === "number" && !Number.isNaN(target)) tw.props.push({ arr, target, rel, s: Float32Array.from(it.idx, (i) => arr[i]) }); };
-        const po = e.positionOffset; if (Array.isArray(po)) { addD(this.dpx, po[0]); addD(this.dpy, po[1]); }
-        addD(this.drot, e.rotationOffset, true);
-        if (Array.isArray(e.scale)) { addD(this.dsx, e.scale[0] / 100); addD(this.dsy, e.scale[1] / 100); } else addD(this.dsx, e.scale / 100) , addD(this.dsy, e.scale / 100);
-        addD(this.dop, e.opacity / 100);
+        const e = it.ev;
+        if (typeof e.visible === "boolean") for (const i of it.idx) this.dvis[i] = e.visible ? 1 : 0;
+        if (typeof e.relativeTo === "string") for (const i of it.idx) this.drel[i] = e.relativeTo;
+        if (typeof e.depth === "number") { for (const i of it.idx) this.ddepth[i] = e.depth; this.depthVer++; }
+        const tw = { t0: it.t, dur: it.dur, idx: it.idx, ease: it.ease, props: [] };
+        const addD = (arr, target) => { if (typeof target === "number" && !Number.isNaN(target)) tw.props.push({ arr, target, s: Float32Array.from(it.idx, (i) => arr[i]) }); };
+        const two = (v, a1, a2, div = 1) => { if (Array.isArray(v)) { addD(a1, typeof v[0] === "number" ? v[0] / div : null); addD(a2, typeof v[1] === "number" ? v[1] / div : null); } };
+        two(e.positionOffset, this.dpx, this.dpy);
+        addD(this.drot, e.rotationOffset);               // 회전은 절대값 (원래 각도 기준)
+        if (Array.isArray(e.scale)) two(e.scale, this.dsx, this.dsy, 100); else if (typeof e.scale === "number") { addD(this.dsx, e.scale / 100); addD(this.dsy, e.scale / 100); }
+        if (typeof e.opacity === "number") addD(this.dop, e.opacity / 100);
+        two(e.pivotOffset, this.dpvx, this.dpvy);
+        two(e.parallax, this.dparx, this.dpary);
+        two(e.parallaxOffset, this.dpox, this.dpoy);
         if (tw.props.length) this.active.push(tw);
         return;
       }
@@ -394,18 +409,26 @@
       if (cnt > 0 && tw.props.length) this.active.push(tw);
     }
     applyActive(t) {
-      for (let k = this.active.length - 1; k >= 0; k--) {
-        const tw = this.active[k];
+      // 오래된 트윈부터 적용해서 같은 값을 만지면 나중 이벤트가 이기도록 한다
+      let w = 0;
+      for (let q = 0; q < this.active.length; q++) {
+        const tw = this.active[q];
         const p = tw.dur > 0 ? clamp((t - tw.t0) / tw.dur, 0, 1) : 1, e = tw.ease(p);
-        if (tw.idx) { for (const pr of tw.props) for (let k = 0; k < tw.idx.length; k++) pr.arr[tw.idx[k]] = pr.s[k] + ((pr.rel ? pr.s[k] + pr.target : pr.target) - pr.s[k]) * e; }
-        else for (const pr of tw.props) for (let i = tw.a; i <= tw.b; i++) pr.arr[i] = pr.s[i - tw.a] + (pr.target - pr.s[i - tw.a]) * e;
-        if (p >= 1) this.active.splice(k, 1);
+        if (tw.idx) {
+          for (const pr of tw.props) for (let k = 0; k < tw.idx.length; k++) pr.arr[tw.idx[k]] = pr.s[k] + (pr.target - pr.s[k]) * e;
+          if (tw.cprops) for (const pr of tw.cprops) for (let k = 0; k < tw.idx.length; k++) { const a0 = pr.s[k], b0 = pr.target; pr.arr[tw.idx[k]] = { r: lerp(a0.r, b0.r, e), g: lerp(a0.g, b0.g, e), b: lerp(a0.b, b0.b, e), a: lerp(a0.a, b0.a, e) }; }
+        } else for (const pr of tw.props) for (let i = tw.a; i <= tw.b; i++) pr.arr[i] = pr.s[i - tw.a] + (pr.target - pr.s[i - tw.a]) * e;
+        if (p < 1) this.active[w++] = tw;
       }
+      this.active.length = w;
     }
     advance(t) {
       if (t < this.last - 1e-6) { this.seek(t); return; }
       const list = this.L.timed;
-      while (this.ptr < list.length && list[this.ptr].t <= t) this.start(list[this.ptr++]);
+      while (this.ptr < list.length && list[this.ptr].t <= t) {
+        const it = list[this.ptr++];
+        this.applyActive(it.t); this.start(it); this.applyActive(it.t);   // 같은 시각의 이벤트가 서로의 결과를 이어받도록 즉시 반영
+      }
       this.applyActive(t);
       this.last = t;
     }
@@ -440,29 +463,43 @@
   const RED = "#ff4d4d", BLUE = "#4d8dff";
 
   /* ---------- 카메라 ---------- */
-  function follow(t) {
-    const i = tileIndexAt(L, t);
-    if (i >= L.n - 1) return [L.X[L.n - 1], L.Y[L.n - 1]];
-    const span = L.T[i + 1] - L.T[i];
-    let p = span > 0 ? clamp((t - L.T[i]) / span, 0, 1) : 1;
-    if (t < 0) p = 0;
-    p = p * p * (3 - 2 * p);
-    return [lerp(L.X[i], L.X[i + 1], p), lerp(L.Y[i], L.Y[i + 1], p)];
+  // 플레이어 추적: 타일 중심들을 시간에 따라 부드러운 곡선(Catmull-Rom)으로 잇는다
+  function followAt(Lv, t) {
+    const n = Lv.n, i = tileIndexAt(Lv, t);
+    if (i >= n - 1) return [Lv.X[n - 1], Lv.Y[n - 1]];
+    const span = Lv.T[i + 1] - Lv.T[i];
+    const u = t < 0 ? 0 : span > 0 ? clamp((t - Lv.T[i]) / span, 0, 1) : 1;
+    const g = (j) => { j = clamp(j, 0, n - 1); return [Lv.X[j], Lv.Y[j]]; };
+    const p0 = g(i - 1), p1 = g(i), p2 = g(i + 1), p3 = g(i + 2);
+    if (Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) > 6 || Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) > 6 || Math.hypot(p3[0] - p2[0], p3[1] - p2[1]) > 6) return [lerp(p1[0], p2[0], u), lerp(p1[1], p2[1], u)];
+    const cr = (a, b, c, d) => 0.5 * (2 * b + (-a + c) * u + (2 * a - 5 * b + 4 * c - d) * u * u + (-a + 3 * b - 3 * c + d) * u * u * u);
+    return [cr(p0[0], p1[0], p2[0], p3[0]), cr(p0[1], p1[1], p2[1], p3[1])];
   }
-  function worldOf(st, t, fol) {
-    if (st.rel === "Global") return [st.pos[0], st.pos[1]];
-    if (st.rel === "Tile") return [L.X[st.tile] + st.pos[0], L.Y[st.tile] + st.pos[1]];
-    return [fol[0] + st.pos[0], fol[1] + st.pos[1]];
+  function baseOf(Lv, st, fol) {
+    if (st.rel === "Global") return [0, 0];
+    if (st.rel === "Tile") return [Lv.X[st.tile], Lv.Y[st.tile]];
+    return fol;
   }
-  function camAt(t) {
-    const fol = follow(t);
-    const k = lastLE(L.cams, t, (c) => c.t);
-    if (k < 0) { const w = worldOf(L.initCam, t, fol); return { x: w[0], y: w[1], rot: L.initCam.rot, zoom: L.initCam.zoom }; }
-    const c = L.cams[k];
+  // k 번째 카메라 이벤트까지 적용된 시각 t 의 카메라 (k<0 이면 초기값)
+  function camEval(Lv, t, k) {
+    const fol = followAt(Lv, t);
+    if (k < 0) { const b = baseOf(Lv, Lv.initCam, fol); return { x: b[0] + Lv.initCam.pos[0], y: b[1] + Lv.initCam.pos[1], rot: Lv.initCam.rot, zoom: Lv.initCam.zoom }; }
+    const c = Lv.cams[k];
     const p = c.dur > 0 ? clamp((t - c.t) / c.dur, 0, 1) : 1, e = c.ease(p);
-    const a = worldOf(c.from, t, fol), b = worldOf(c.to, t, fol);
-    return { x: lerp(a[0], b[0], e), y: lerp(a[1], b[1], e), rot: lerp(c.from.rot, c.to.rot, e), zoom: lerp(c.from.zoom, c.to.zoom, e) };
+    const b = baseOf(Lv, c.to, fol);
+    return { x: b[0] + lerp(c.snapOff[0], c.to.pos[0], e), y: b[1] + lerp(c.snapOff[1], c.to.pos[1], e), rot: lerp(c.snap.rot, c.to.rot, e), zoom: lerp(c.snap.zoom, c.to.zoom, e) };
   }
+  // 각 이벤트 시작 순간의 실제 카메라를 저장 -> 이벤트가 겹쳐도 값이 튀지 않는다
+  function computeCamSnaps(Lv) {
+    for (let k = 0; k < Lv.cams.length; k++) {
+      const c = Lv.cams[k];
+      c.snap = camEval(Lv, c.t, k - 1);
+      const b = baseOf(Lv, c.to, followAt(Lv, c.t));
+      c.snapOff = [c.snap.x - b[0], c.snap.y - b[1]];
+    }
+  }
+  const follow = (t) => followAt(L, t);
+  function camAt(t) { return camEval(L, t, lastLE(L.cams, t, (c) => c.t)); }
 
   /* ---------- 그리기 ---------- */
   function resize() {
@@ -611,6 +648,15 @@
     ctx.fillStyle = base + alpha.toFixed(3) + ")"; ctx.strokeStyle = `rgba(255,255,255,${(0.9 * alpha).toFixed(3)})`; ctx.lineWidth = 0.045 * k;
     ctx.beginPath(); ctx.arc(x, y, 0.17 * k, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   }
+  const ICONS = { Rabbit: "»", DoubleRabbit: "»»", Snail: "«", DoubleSnail: "««", Swirl: "↻", Portal: "◎", Checkpoint: "⚑", MultiPlanetTwoPlanets: "2", MultiPlanetThreePlanets: "3", MultiPlanetThreeMore: "3+" };
+  let depthCache = null;
+  function decLists() {
+    if (!L.hasDepthEv) return [L.decBack, L.decFront];
+    if (depthCache && depthCache.v === eng.depthVer && depthCache.e === eng) return depthCache.l;
+    const ids = L.decos.map((_, i) => i).sort((a, b) => eng.ddepth[b] - eng.ddepth[a]);
+    depthCache = { v: eng.depthVer, e: eng, l: [ids.filter((i) => eng.ddepth[i] > 0), ids.filter((i) => eng.ddepth[i] <= 0)] };
+    return depthCache.l;
+  }
   function drawDecors(list, cam, vis) {
     if (!list.length) return;
     for (const di of list) {
@@ -619,33 +665,41 @@
       const op = eng.dop[di];
       const alpha = d.obj === "planet" ? eng.dpcol[di].a * op : op;
       if (alpha <= 0.003) continue;
+      const rel = eng.drel[di];
       let bx, by;
-      if (d.rel === "Global") { bx = d.pos[0]; by = d.pos[1]; }
-      else if (d.rel === "Camera" || d.rel === "CameraAspect") { bx = cam.x + d.pos[0]; by = cam.y + d.pos[1]; }
+      if (rel === "Global") { bx = d.pos[0]; by = d.pos[1]; }
+      else if (rel === "Camera" || rel === "CameraAspect") { bx = cam.x + d.pos[0]; by = cam.y + d.pos[1]; }
       else { bx = L.X[d.floor] + d.pos[0]; by = L.Y[d.floor] + d.pos[1]; }
       bx += eng.dpx[di]; by += eng.dpy[di];
-      if (d.parallax) { bx += (d.parallax[0] / 100) * (cam.x - d.parOff[0]); by += (d.parallax[1] / 100) * (cam.y - d.parOff[1]); }
+      const pax = eng.dparx[di], pay = eng.dpary[di];
+      if (pax || pay) { bx += (pax / 100) * (cam.x - eng.dpox[di]); by += (pay / 100) * (cam.y - eng.dpoy[di]); }
       if (d.obj && (Math.abs(bx - cam.x) > vis + 3 || Math.abs(by - cam.y) > vis + 3)) continue;
       ctx.save(); ctx.globalAlpha = clamp(alpha, 0, 1);
       ctx.translate(bx, by);
-      if (d.rel === "Camera" || d.rel === "CameraAspect") ctx.rotate(-cam.rot * D2R);
+      if (rel === "Camera" || rel === "CameraAspect") ctx.rotate(-cam.rot * D2R);
+      // 회전은 피벗(위치 + pivotOffset)을 중심으로 한다
+      const pvx = eng.dpvx[di], pvy = eng.dpvy[di];
+      ctx.translate(pvx, pvy);
       const r = d.rot + eng.drot[di]; if (r) ctx.rotate(r * D2R);
+      ctx.translate(-pvx, -pvy);
       const sx = eng.dsx[di], sy = eng.dsy[di];
       if (d.obj === "floor") {
         ctx.scale(sx, sy); ctx.lineJoin = "miter"; ctx.lineCap = "butt";
         const h = 0.465, a2 = d.angle * D2R;
         strokeShape(h, 0, d.tmid ? h : Math.cos(a2) * h, d.tmid ? 0 : Math.sin(a2) * h, eng.dstyle[di], eng.dcol[di], d.tmid);
+        const ic = ICONS[eng.dicon[di]];
+        if (ic) { ctx.save(); ctx.scale(0.0055, -0.0055); ctx.font = "100px 'Noto Sans KR', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = "rgba(255,255,255,.92)"; ctx.fillText(ic, 0, 0); ctx.restore(); }
       } else if (d.obj === "planet") {
         drawPlanetAt(0, 0, eng.dpcol[di], Math.max(sx, sy), 1);
       } else if (d.text) {
         const k = 0.008;
         ctx.scale(sx * k, -sy * k); ctx.font = "100px 'Noto Sans KR', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = css(d.color);
-        ctx.fillText(d.str, -d.pivot[0] * 100, d.pivot[1] * 100);
+        ctx.fillText(d.str, 0, 0);
       } else {
         const img = assetImg(d.img);
         if (img) {
           const w = img.width / 100, h = img.height / 100;
-          ctx.scale(sx, -sy); ctx.drawImage(img, -w / 2 - d.pivot[0], -h / 2 + d.pivot[1], w, h);
+          ctx.scale(sx, -sy); ctx.drawImage(img, -w / 2, -h / 2, w, h);
         }
       }
       ctx.restore();
@@ -704,7 +758,7 @@
     ctx.translate(-(cam.x + shx), -(cam.y + shy));
     ctx.lineCap = "butt"; ctx.lineJoin = "miter"; ctx.miterLimit = 2.2;
 
-    drawDecors(L.decBack, cam, (0.5 * Math.hypot(W, H)) / ppt);
+    drawDecors(decLists()[0], cam, (0.5 * Math.hypot(W, H)) / ppt);
     const R = (0.5 * Math.hypot(W, H)) / ppt + 3;
     const cx = cam.x + shx, cy = cam.y + shy;
     const an = (() => { const k = lastLE(L.animEv, T, (e) => e.t); return k < 0 ? L.animBase : L.animEv[k].state; })();
@@ -719,7 +773,7 @@
     }
     ctx.globalAlpha = 1;
 
-    drawDecors(L.decFront, cam, (0.5 * Math.hypot(W, H)) / ppt);
+    drawDecors(decLists()[1], cam, (0.5 * Math.hypot(W, H)) / ppt);
     // 공
     const ps = planetState(T);
     const pi = ps.i, a = ps.ang * D2R;
@@ -936,5 +990,5 @@
   requestAnimationFrame(loop);
 
   // 테스트/디버그용 훅
-  window.__player = { get T() { return T; }, seek: seekTo, play: setPlaying, get level() { return L; }, loadMap };
+  window.__player = { get T() { return T; }, seek: seekTo, play: setPlaying, get level() { return L; }, cam: (t) => camAt(t), eng: () => eng, loadMap };
 })();
