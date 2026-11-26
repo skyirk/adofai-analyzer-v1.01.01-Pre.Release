@@ -70,8 +70,29 @@
   }
 
   /* ---------- 지원 이벤트 ---------- */
-  const SUPPORTED = new Set(["SetSpeed", "Twirl", "Pause", "Hold", "MoveCamera", "MoveTrack", "PositionTrack", "ColorTrack", "RecolorTrack", "Flash", "SetFilter", "Bloom", "ShakeScreen", "CustomBackground", "MoveDecorations", "AddDecoration", "AddText", "AddObject", "SetObject", "RepeatEvents", "ScalePlanets", "ScaleRadius", "AnimateTrack"]);
+  const SUPPORTED = new Set(["SetSpeed", "Twirl", "Pause", "Hold", "MoveCamera", "MoveTrack", "PositionTrack", "ColorTrack", "RecolorTrack", "Flash", "SetFilter", "Bloom", "ShakeScreen", "CustomBackground", "MoveDecorations", "AddDecoration", "AddText", "AddObject", "SetObject", "SetText", "RepeatEvents", "ScalePlanets", "ScaleRadius", "AnimateTrack", "SetFilterAdvanced", "ScreenTile", "ScreenScroll", "HallOfMirrors"]);
   const HARMLESS = new Set(["EditorComment", "Bookmark", "SetHitsound", "Checkpoint", "SetFrameRate", "SetFloorIcon", "ScaleMargin", "Hide", "PlaySound"]);
+  // 필터 이름 -> 효과 종류 (기본 SetFilter 와 SetFilterAdvanced 의 CameraFilterPack_* 공통)
+  const FX_BASIC = { Grayscale: "gray", Sepia: "sepia", Invert: "invert", Blur: "blur", GaussianBlur: "blur", BlurFocus: "blur", Waves: "wave", LightWater: "wave", Aberration: "aberr", Static: "noise", Grain: "noise", Compression: "pixel", Contrast: "contrast", Sharpen: "contrast", VHS: "vhs", NightVision: "night", Neon: "neon", Funk: "funk", Glitch: "glitch", Pixelate: "pixel", Mosaic: "pixel" };
+  function fxKindOf(name) {
+    if (FX_BASIC[name]) return FX_BASIC[name];
+    const n = String(name || "").replace(/^CameraFilterPack_/, "");
+    if (/^Blur_/.test(n)) return "blur";
+    if (/Distortion_Wave|Light_Water|Water/.test(n)) return "wave";
+    if (/Chromatic|Chromatical|Aberration/.test(n)) return "aberr";
+    if (/TV_VHS|VHS/.test(n)) return "vhs";
+    if (/Glitch/.test(n)) return "glitch";
+    if (/WideScreenHorizontal/.test(n)) return "barsH";
+    if (/WideScreenVertical/.test(n)) return "barsV";
+    if (/Artefact|Noise|Grain|Static/.test(n)) return "noise";
+    if (/Contrast|ColorPerfection/.test(n)) return "contrast";
+    return null;
+  }
+  function parseProps(p) {
+    if (p && typeof p === "object") return p;
+    if (typeof p !== "string" || !p.trim()) return {};
+    try { return JSON.parse("{" + p.replace(/^\s*\{|\}\s*$/g, "") + "}"); } catch (e) { return {}; }
+  }
   const FILTER_CSS = {
     Grayscale: (i) => `grayscale(${i}%)`, Sepia: (i) => `sepia(${i}%)`, Invert: (i) => `invert(${i}%)`,
     Blur: (i) => `blur(${(i / 100) * 8}px)`, BlurFocus: (i) => `blur(${(i / 100) * 5}px)`,
@@ -248,6 +269,34 @@
       prev = c.to;
     }
 
+    // 화면 효과(필터 + 고급 필터): 이름별 구간 목록
+    const fxSegs = {};
+    const fxNames = new Set(items.filter((it) => it.ev.eventType === "SetFilter" || it.ev.eventType === "SetFilterAdvanced").map((it) => String(it.ev.filter)));
+    for (const it of items) {
+      const e = it.ev;
+      if (e.eventType !== "SetFilter" && e.eventType !== "SetFilterAdvanced") continue;
+      const name = String(e.filter), adv = e.eventType === "SetFilterAdvanced";
+      const on = bool(e.enabled, true);
+      const seg = { t: it.t, dur: evDur(e), ease: easeFn(e.ease), to: on ? (adv ? 1 : clamp(Number(e.intensity ?? 100), 0, 100) / 100) : 0, props: adv ? parseProps(e.filterProperties) : {}, kind: fxKindOf(name) };
+      (fxSegs[name] = fxSegs[name] || []).push(seg);
+      if (bool(e.disableOthers)) for (const o of fxNames) if (o !== name) (fxSegs[o] = fxSegs[o] || []).push({ t: it.t, dur: 0, ease: easeFn("Linear"), to: 0, props: {}, kind: fxKindOf(o) });
+    }
+    for (const k of Object.keys(fxSegs)) { fxSegs[k].sort(byT); let pv = 0; for (const g of fxSegs[k]) { g.from = pv; pv = g.to; } }
+    const vec2 = (v, d) => (Array.isArray(v) ? [Number(v[0]), Number(v[1])].map((x, k) => (Number.isFinite(x) ? x : d[k])) : d);
+    // ScreenTile / ScreenScroll / HallOfMirrors
+    const tileSegs = [], scrollSegs = [], mirrorSegs = [];
+    let ptile = [1, 1], poff = [0, 0];
+    for (const it of items) {
+      const e = it.ev;
+      if (e.eventType === "ScreenTile") { const to = vec2(e.tile, [1, 1]); tileSegs.push({ t: it.t, dur: evDur(e), ease: easeFn(e.ease), from: ptile, to }); ptile = to; }
+      else if (e.eventType === "HallOfMirrors") mirrorSegs.push({ t: it.t, on: bool(e.enabled, true) });
+    }
+    {
+      const sc = items.filter((it) => it.ev.eventType === "ScreenScroll").sort(byT);
+      let lt = 0, ls = [0, 0];
+      for (const it of sc) { poff = [poff[0] + ls[0] * (it.t - lt), poff[1] + ls[1] * (it.t - lt)]; ls = vec2(it.ev.scroll, [0, 0]); lt = it.t; scrollSegs.push({ t: it.t, off: poff, speed: ls }); }
+    }
+    tileSegs.sort(byT); mirrorSegs.sort(byT);
     // 필터 / 블룸 / 배경 상태 열
     const filtStates = [];
     let fs = {};
@@ -256,10 +305,11 @@
       if (bool(e.disableOthers)) fs = {};
       else fs = { ...fs };
       const on = bool(e.enabled, true);
-      if (on) { fs[name] = clamp(Number(e.intensity ?? 100), 0, 100); if (!FILTER_CSS[name]) unsupportedFilters.add(name); }
+      if (on) { fs[name] = clamp(Number(e.intensity ?? 100), 0, 100); if (!fxKindOf(name) && !FILTER_CSS[name]) unsupportedFilters.add(name); }
       else delete fs[name];
       filtStates.push(fs);
     }
+    for (const nme of fxNames) if (!fxKindOf(nme) && !FILTER_CSS[nme]) unsupportedFilters.add(nme);
     const bloomStates = bloomEv.map((b) => ({ on: bool(b.ev.enabled, true), intensity: Number(b.ev.intensity ?? 100), threshold: Number(b.ev.threshold ?? 50), color: hex(b.ev.color, hex("ffffff")) }));
     const par2 = (v) => (Array.isArray(v) ? [Number(v[0]) || 0, Number(v[1]) || 0] : [100, 100]);
     const bgBase = { color: hex(S.backgroundColor, hex("000000")), img: S.bgImage || "", imgColor: hex(S.bgImageColor, hex("ffffff")), mode: S.bgDisplayMode || "FitToScreen", parallax: par2(S.parallax), loop: bool(S.loopBG) };
@@ -285,7 +335,7 @@
       if (isPlanet) { if (d.planetColorType === "DefaultRed") pcol = hex("ff4d4d"); else if (d.planetColorType === "DefaultBlue") pcol = hex("4d8dff"); }
       decos.push({
         text: kind === "AddText", obj: isPlanet ? "planet" : isFloor ? "floor" : "", angle: Number(d.trackAngle ?? 180), tmid: d.trackType === "Midspin",
-        icon: d.trackIcon || "None", style: d.trackStyle || "Standard", col: hex(d.trackColor, hex("debb7b")), pcol,
+        icon: d.trackIcon || "None", lockRot: bool(d.lockRotation, false), lockScale: bool(d.lockScale, false), blend: d.blendMode || "None", maskType: d.maskingType || "None", maskTarget: d.maskingTarget || "", style: d.trackStyle || "Standard", col: hex(d.trackColor, hex("debb7b")), pcol,
         img: d.decorationImage || "", str: String(d.decText || "").replace(/<[^>]*>/g, ""),
         pos: v2(d.position, [0, 0]), rel: d.relativeTo || "Tile", floor: clamp(d.floor | 0, 0, n - 1), pivot: v2(d.pivotOffset, [0, 0]), rot: Number(d.rotation) || 0,
         sc: v2(d.scale, [100, 100]), color: hex(d.color, hex("ffffff")), depth: Number(d.depth ?? -1),
@@ -294,13 +344,15 @@
         visible: d.visible === undefined ? true : bool(d.visible, true),
       });
     }
+    const maskShapes = {};
+    decos.forEach((d, i) => { if (d.maskType === "Mask") d.tags.forEach((t) => (maskShapes[t] = maskShapes[t] || []).push(i)); });
     const tagMap = {};
     decos.forEach((d, i) => d.tags.forEach((t) => (tagMap[t] = tagMap[t] || []).push(i)));
     for (const it of items) {
       const ev = it.ev;
-      if (ev.eventType !== "MoveDecorations" && ev.eventType !== "SetObject") continue;
+      if (ev.eventType !== "MoveDecorations" && ev.eventType !== "SetObject" && ev.eventType !== "SetText") continue;
       const idx = [...new Set(String(ev.tag || "").split(/\s+/).flatMap((t) => tagMap[t] || []))];
-      if (idx.length) timed.push({ t: it.t, dur: evDur(ev), kind: ev.eventType === "SetObject" ? "setobj" : "decmove", ev, idx, ease: easeFn(ev.ease) });
+      if (idx.length) timed.push({ t: it.t, dur: evDur(ev), kind: ev.eventType === "SetObject" ? "setobj" : ev.eventType === "SetText" ? "settext" : "decmove", ev, idx, ease: easeFn(ev.ease) });
     }
     timed.sort(byT);
     const hasDepthEv = items.some((it) => it.ev.eventType === "MoveDecorations" && typeof it.ev.depth === "number");
@@ -331,7 +383,7 @@
     const out = {
       S, n, X, Y, SHX, SHY, eff, mid, aIn, aOut, T, bpmAt, cw, delta, waitT, rotT, byFloor,
       col1, col2, colMode, tstyle, base, timed, cams, initCam, flashes, shakes,
-      filtEv, filtStates, bloomEv, bloomStates, bgEv, bgStates, bgBase, decos, decBack, decFront, hasDepthEv, animBase, animEv, pScale, rScale,
+      fxSegs, tileSegs, scrollSegs, mirrorSegs, filtEv, filtStates, bloomEv, bloomStates, bgEv, bgStates, bgBase, decos, decBack, decFront, hasDepthEv, maskShapes, animBase, animEv, pScale, rScale,
       pre: (Number(S.countdownTicks ?? 4) || 0) * (60 / (Number(S.bpm) > 0 ? Number(S.bpm) : bpmAt[0])),
       end: T[n - 1] + 2 * (60 / bpmAt[n - 1]),
       info: { images: [...new Set(decos.map((d) => d.img).concat(bgBase.img, bgStates.map((b) => b.img)).filter(Boolean))], tiles: n, bpmMin: Math.min(...bpms), bpmMax: Math.max(...bpms), supported, unsupported, decoCount, unsupportedFilters: [...unsupportedFilters], duration: T[n - 1] },
@@ -355,7 +407,7 @@
       this.dpvx = Float32Array.from(this.L.decos, (d) => d.pivot[0]); this.dpvy = Float32Array.from(this.L.decos, (d) => d.pivot[1]);
       this.dparx = Float32Array.from(this.L.decos, (d) => (d.parallax ? d.parallax[0] : 0)); this.dpary = Float32Array.from(this.L.decos, (d) => (d.parallax ? d.parallax[1] : 0));
       this.dpox = Float32Array.from(this.L.decos, (d) => d.parOff[0]); this.dpoy = Float32Array.from(this.L.decos, (d) => d.parOff[1]);
-      this.ddepth = Float32Array.from(this.L.decos, (d) => d.depth); this.drel = this.L.decos.map((d) => d.rel); this.dicon = this.L.decos.map((d) => d.icon); this.depthVer = 0;
+      this.ddepth = Float32Array.from(this.L.decos, (d) => d.depth); this.drel = this.L.decos.map((d) => d.rel); this.dicon = this.L.decos.map((d) => d.icon); this.depthVer = 0; this.dtext = this.L.decos.map((d) => d.str);
       this.dstyle = this.L.decos.map((d) => d.style); this.dcol = this.L.decos.map((d) => d.col); this.dpcol = this.L.decos.map((d) => d.pcol);
       this.ptr = 0; this.active = []; this.last = -Infinity; this.n = n;
     }
@@ -369,6 +421,7 @@
         }
         return;
       }
+      if (it.kind === "settext") { if (typeof it.ev.decText === "string") for (const i of it.idx) this.dtext[i] = it.ev.decText.replace(/<[^>]*>/g, ""); return; }
       if (it.kind === "setobj") {
         const e = it.ev, tw = { t0: it.t, dur: it.dur, idx: it.idx, ease: it.ease, props: [], cprops: [] };
         const addC = (arr, hexv) => { const c = hex(hexv, null); if (c) tw.cprops.push({ arr, target: c, s: it.idx.map((i) => arr[i]) }); };
@@ -456,7 +509,8 @@
   }
 
   /* ---------- 상태 ---------- */
-  const cv = $("#cv"), ctx = cv.getContext("2d");
+  const cv = $("#cv"), mainCtx = cv.getContext("2d");
+  let ctx = mainCtx;
   const small = document.createElement("canvas"), sctx = small.getContext("2d");
   let viewScale = 1, infoArgs = null, L = null, eng = null, T = 0, playing = false, rate = 1, offsetMs = 0, hitOn = false, audio = null, audioUrl = null, lastTs = 0, lastIdx = 0;
   let pitch = 1, lastFilter = "", ac = null, vol = 0.6;
@@ -657,52 +711,106 @@
     depthCache = { v: eng.depthVer, e: eng, l: [ids.filter((i) => eng.ddepth[i] > 0), ids.filter((i) => eng.ddepth[i] <= 0)] };
     return depthCache.l;
   }
+  // 색 곱하기(틴트) 캐시
+  const tintCache = new Map();
+  function tinted(img, key, c) {
+    const k = key + "|" + (c.r | 0) + "," + (c.g | 0) + "," + (c.b | 0);
+    let t = tintCache.get(k);
+    if (t) return t;
+    const w = Math.min(img.width, 2048), h = Math.min(img.height, 2048);
+    t = document.createElement("canvas"); t.width = w; t.height = h;
+    const x = t.getContext("2d");
+    x.drawImage(img, 0, 0, w, h);
+    x.globalCompositeOperation = "multiply"; x.fillStyle = `rgb(${c.r | 0},${c.g | 0},${c.b | 0})`; x.fillRect(0, 0, w, h);
+    x.globalCompositeOperation = "destination-in"; x.drawImage(img, 0, 0, w, h);
+    tintCache.set(k, t);
+    if (tintCache.size > 400) tintCache.delete(tintCache.keys().next().value);
+    return t;
+  }
+  const BLEND = { Screen: "screen", Multiply: "multiply", Overlay: "overlay", Difference: "difference", Darken: "darken", Lighten: "lighten", Exclusion: "exclusion", ColorDodge: "color-dodge", Add: "lighter" };
+  let layerA = null, layerB = null;
+  function layers() {
+    if (!layerA) { layerA = document.createElement("canvas"); layerB = document.createElement("canvas"); }
+    if (layerA.width !== cv.width || layerA.height !== cv.height) { layerA.width = layerB.width = cv.width; layerA.height = layerB.height = cv.height; }
+    return [layerA, layerB];
+  }
+  function decoPlace(di, cam) {
+    const d = L.decos[di], rel = eng.drel[di];
+    const k = d.lockScale ? cam.zoom / 100 : 1;
+    let bx, by;
+    if (rel === "Camera" || rel === "CameraAspect") {
+      const px = (d.pos[0] + eng.dpx[di]) * k, py = (d.pos[1] + eng.dpy[di]) * k, R = cam.rot * D2R, cs = Math.cos(R), sn = Math.sin(R);
+      bx = cam.x + px * cs - py * sn; by = cam.y + px * sn + py * cs;
+    } else {
+      if (rel === "Global") { bx = d.pos[0]; by = d.pos[1]; } else { bx = L.X[d.floor] + d.pos[0]; by = L.Y[d.floor] + d.pos[1]; }
+      bx += eng.dpx[di]; by += eng.dpy[di];
+    }
+    const pax = eng.dparx[di], pay = eng.dpary[di];
+    if (pax || pay) { bx += (pax / 100) * (cam.x - eng.dpox[di]); by += (pay / 100) * (cam.y - eng.dpoy[di]); }
+    return [bx, by, k];
+  }
+  // 한 장식을 현재 ctx 에 그린다 (마스크 레이어에도 재사용)
+  function drawDecoOne(di, cam, vis, ignoreMask) {
+    const d = L.decos[di];
+    if (!eng.dvis[di]) return;
+    const op = eng.dop[di];
+    const alpha = (d.obj === "planet" ? eng.dpcol[di].a * op : op) * (d.obj || d.text ? 1 : d.color.a);
+    if (alpha <= 0.003) return;
+    const [bx, by, k] = decoPlace(di, cam);
+    if (d.obj && (Math.abs(bx - cam.x) > vis + 3 || Math.abs(by - cam.y) > vis + 3)) return;
+    ctx.save(); ctx.globalAlpha = clamp(alpha, 0, 1);
+    if (d.blend !== "None" && BLEND[d.blend]) ctx.globalCompositeOperation = BLEND[d.blend];
+    ctx.translate(bx, by);
+    if (d.lockRot) ctx.rotate(cam.rot * D2R);            // 카메라 회전을 상쇄
+    const pvx = eng.dpvx[di], pvy = eng.dpvy[di];
+    ctx.translate(pvx * k, pvy * k);
+    const r = d.rot + eng.drot[di]; if (r) ctx.rotate(r * D2R);
+    ctx.translate(-pvx * k, -pvy * k);
+    const sx = eng.dsx[di] * k, sy = eng.dsy[di] * k;
+    if (d.obj === "floor") {
+      ctx.scale(sx, sy); ctx.lineJoin = "miter"; ctx.lineCap = "butt";
+      const h = 0.465, a2 = d.angle * D2R;
+      strokeShape(h, 0, d.tmid ? h : Math.cos(a2) * h, d.tmid ? 0 : Math.sin(a2) * h, eng.dstyle[di], eng.dcol[di], d.tmid);
+      const ic = ICONS[eng.dicon[di]];
+      if (ic) { ctx.save(); ctx.scale(0.0055, -0.0055); ctx.font = "100px 'Noto Sans KR', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = "rgba(255,255,255,.92)"; ctx.fillText(ic, 0, 0); ctx.restore(); }
+    } else if (d.obj === "planet") {
+      drawPlanetAt(0, 0, eng.dpcol[di], Math.max(sx, sy), 1);
+    } else if (d.text) {
+      const kk = 0.008;
+      ctx.scale(sx * kk, -sy * kk); ctx.font = "100px 'Noto Sans KR', 'Times New Roman', serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = css(d.color);
+      ctx.fillText(eng.dtext[di], 0, 0);
+    } else {
+      let img = assetImg(d.img);
+      if (img) {
+        const w = img.width / 100, h = img.height / 100;
+        const c = d.color; if (c.r < 250 || c.g < 250 || c.b < 250) img = tinted(img, d.img, c);
+        ctx.scale(sx, -sy); ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      }
+    }
+    ctx.restore();
+  }
   function drawDecors(list, cam, vis) {
     if (!list.length) return;
     for (const di of list) {
       const d = L.decos[di];
-      if (!eng.dvis[di]) continue;
-      const op = eng.dop[di];
-      const alpha = d.obj === "planet" ? eng.dpcol[di].a * op : op;
-      if (alpha <= 0.003) continue;
-      const rel = eng.drel[di];
-      let bx, by;
-      if (rel === "Global") { bx = d.pos[0]; by = d.pos[1]; }
-      else if (rel === "Camera" || rel === "CameraAspect") { bx = cam.x + d.pos[0]; by = cam.y + d.pos[1]; }
-      else { bx = L.X[d.floor] + d.pos[0]; by = L.Y[d.floor] + d.pos[1]; }
-      bx += eng.dpx[di]; by += eng.dpy[di];
-      const pax = eng.dparx[di], pay = eng.dpary[di];
-      if (pax || pay) { bx += (pax / 100) * (cam.x - eng.dpox[di]); by += (pay / 100) * (cam.y - eng.dpoy[di]); }
-      if (d.obj && (Math.abs(bx - cam.x) > vis + 3 || Math.abs(by - cam.y) > vis + 3)) continue;
-      ctx.save(); ctx.globalAlpha = clamp(alpha, 0, 1);
-      ctx.translate(bx, by);
-      if (rel === "Camera" || rel === "CameraAspect") ctx.rotate(-cam.rot * D2R);
-      // 회전은 피벗(위치 + pivotOffset)을 중심으로 한다
-      const pvx = eng.dpvx[di], pvy = eng.dpvy[di];
-      ctx.translate(pvx, pvy);
-      const r = d.rot + eng.drot[di]; if (r) ctx.rotate(r * D2R);
-      ctx.translate(-pvx, -pvy);
-      const sx = eng.dsx[di], sy = eng.dsy[di];
-      if (d.obj === "floor") {
-        ctx.scale(sx, sy); ctx.lineJoin = "miter"; ctx.lineCap = "butt";
-        const h = 0.465, a2 = d.angle * D2R;
-        strokeShape(h, 0, d.tmid ? h : Math.cos(a2) * h, d.tmid ? 0 : Math.sin(a2) * h, eng.dstyle[di], eng.dcol[di], d.tmid);
-        const ic = ICONS[eng.dicon[di]];
-        if (ic) { ctx.save(); ctx.scale(0.0055, -0.0055); ctx.font = "100px 'Noto Sans KR', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = "rgba(255,255,255,.92)"; ctx.fillText(ic, 0, 0); ctx.restore(); }
-      } else if (d.obj === "planet") {
-        drawPlanetAt(0, 0, eng.dpcol[di], Math.max(sx, sy), 1);
-      } else if (d.text) {
-        const k = 0.008;
-        ctx.scale(sx * k, -sy * k); ctx.font = "100px 'Noto Sans KR', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = css(d.color);
-        ctx.fillText(d.str, 0, 0);
-      } else {
-        const img = assetImg(d.img);
-        if (img) {
-          const w = img.width / 100, h = img.height / 100;
-          ctx.scale(sx, -sy); ctx.drawImage(img, -w / 2, -h / 2, w, h);
-        }
+      if (d.maskType === "Mask") continue;                  // 마스크 모양 자체는 그리지 않는다
+      if (d.maskType === "VisibleInsideMask" || d.maskType === "VisibleOutsideMask") {
+        if (!eng.dvis[di] || eng.dop[di] <= 0.003) continue;
+        const shapes = L.maskShapes[d.maskTarget] || [];
+        const inside = d.maskType === "VisibleInsideMask";
+        if (!shapes.length) { if (!inside) drawDecoOne(di, cam, vis); continue; }
+        const [A, B] = layers(), a = A.getContext("2d"), b = B.getContext("2d"), tm = mainCtx.getTransform();
+        a.setTransform(1, 0, 0, 1, 0, 0); a.globalCompositeOperation = "source-over"; a.clearRect(0, 0, A.width, A.height);
+        b.setTransform(1, 0, 0, 1, 0, 0); b.globalCompositeOperation = "source-over"; b.clearRect(0, 0, B.width, B.height);
+        a.setTransform(tm); b.setTransform(tm);
+        ctx = a; drawDecoOne(di, cam, vis);
+        ctx = b; for (const m of shapes) drawDecoOne(m, cam, vis);
+        ctx = mainCtx;
+        a.setTransform(1, 0, 0, 1, 0, 0); a.globalCompositeOperation = inside ? "destination-in" : "destination-out"; a.drawImage(B, 0, 0); a.globalCompositeOperation = "source-over";
+        mainCtx.save(); mainCtx.setTransform(1, 0, 0, 1, 0, 0); mainCtx.drawImage(A, 0, 0); mainCtx.restore();
+        continue;
       }
-      ctx.restore();
+      drawDecoOne(di, cam, vis);
     }
   }
 
@@ -722,6 +830,93 @@
       ang = L.aIn[i] + dirSign * p * L.delta[i];
     }
     return { i: pivot, ang, last };
+  }
+
+  /* ---------- 화면 후처리 (필터 / 타일 / 스크롤 / 거울) — Canvas2D 근사 ---------- */
+  let pcv = null, qcv = null, noiseCv = null;
+  const rnd = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+  function fxAt(t) {
+    const act = {};
+    for (const name of Object.keys(L.fxSegs)) {
+      const segs = L.fxSegs[name], k = lastLE(segs, t, (g) => g.t);
+      if (k < 0) continue;
+      const g = segs[k], p = g.dur > 0 ? clamp((t - g.t) / g.dur, 0, 1) : 1, v = lerp(g.from, g.to, g.ease(p));
+      if (v > 0.002 && g.kind && (!act[g.kind] || act[g.kind].v < v)) act[g.kind] = { v, props: g.props };
+    }
+    return act;
+  }
+  function postProcess(t, W, H) {
+    const act = L.fxSegs ? fxAt(t) : {};
+    const cssParts = [];
+    const A = (k) => act[k] && act[k].v;
+    if (A("gray")) cssParts.push(`grayscale(${A("gray") * 100}%)`);
+    if (A("sepia")) cssParts.push(`sepia(${A("sepia") * 100}%)`);
+    if (A("invert")) cssParts.push(`invert(${A("invert") * 100}%)`);
+    if (A("blur")) cssParts.push(`blur(${(A("blur") * 7).toFixed(2)}px)`);
+    if (A("contrast")) cssParts.push(`contrast(${100 + A("contrast") * 60}%) saturate(${100 + A("contrast") * 30}%)`);
+    if (A("night")) cssParts.push(`grayscale(${A("night") * 100}%) sepia(${A("night") * 40}%) hue-rotate(60deg) brightness(1.2)`);
+    if (A("neon")) cssParts.push(`saturate(${100 + A("neon") * 150}%) contrast(${100 + A("neon") * 30}%)`);
+    if (A("funk")) cssParts.push(`hue-rotate(${A("funk") * 360}deg)`);
+    const fcss = cssParts.join(" ");
+    if (fcss !== lastFilter) { cv.style.filter = fcss || "none"; lastFilter = fcss; }
+
+    // 타일 / 스크롤
+    let tx = 1, ty = 1;
+    if (L.tileSegs.length) { const k = lastLE(L.tileSegs, t, (g) => g.t); if (k >= 0) { const g = L.tileSegs[k], p = g.dur > 0 ? clamp((t - g.t) / g.dur, 0, 1) : 1, e = g.ease(p); tx = lerp(g.from[0], g.to[0], e); ty = lerp(g.from[1], g.to[1], e); } }
+    let sx = 0, sy = 0;
+    if (L.scrollSegs.length) { const k = lastLE(L.scrollSegs, t, (g) => g.t); if (k >= 0) { const g = L.scrollSegs[k]; sx = g.off[0] + g.speed[0] * (t - g.t); sy = g.off[1] + g.speed[1] * (t - g.t); } }
+    const km = L.mirrorSegs.length ? lastLE(L.mirrorSegs, t, (g) => g.t) : -1;
+    const mirror = km >= 0 && L.mirrorSegs[km].on;
+    const needTile = Math.abs(tx - 1) > 0.001 || Math.abs(ty - 1) > 0.001 || sx || sy;
+    const canvasFx = ["wave", "aberr", "noise", "pixel", "vhs", "glitch", "barsH", "barsV"].filter((k) => act[k]);
+    if (!needTile && !mirror && !canvasFx.length) return;
+
+    if (!pcv) { pcv = document.createElement("canvas"); qcv = document.createElement("canvas"); }
+    if (pcv.width !== W || pcv.height !== H) { pcv.width = qcv.width = W; pcv.height = qcv.height = H; }
+    const pc = pcv.getContext("2d"), qc = qcv.getContext("2d");
+    const grab = () => { pc.setTransform(1, 0, 0, 1, 0, 0); pc.globalCompositeOperation = "source-over"; pc.globalAlpha = 1; pc.clearRect(0, 0, W, H); pc.drawImage(cv, 0, 0); };
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+
+    if (needTile) {
+      grab(); ctx.clearRect(0, 0, W, H);
+      const pat = ctx.createPattern(pcv, "repeat");
+      ctx.save(); ctx.translate(W / 2 - (W / 2) / tx + ((sx * 0.01 * W) % W), H / 2 - (H / 2) / ty - ((sy * 0.01 * H) % H)); ctx.scale(1 / tx, 1 / ty); ctx.fillStyle = pat; ctx.fillRect(-W * 4, -H * 4, W * 9, H * 9); ctx.restore();
+    }
+    if (mirror) { grab(); ctx.clearRect(0, 0, W, H); ctx.drawImage(pcv, 0, 0); ctx.save(); ctx.translate(W, 0); ctx.scale(-1, 1); ctx.drawImage(pcv, 0, 0, W / 2, H, 0, 0, W / 2, H); ctx.restore(); }
+
+    const wave = (v, amp, freq, spd) => {
+      grab(); ctx.clearRect(0, 0, W, H);
+      const step = Math.max(2, Math.round(H / 180));
+      for (let y = 0; y < H; y += step) ctx.drawImage(pcv, 0, y, W, step, Math.sin(y / H * freq + t * spd) * amp * v * W, y, W, step);
+    };
+    const aberr = (v) => {
+      grab(); const d = Math.max(1, v * W * 0.012);
+      const ch = (col, dx) => { qc.setTransform(1, 0, 0, 1, 0, 0); qc.globalCompositeOperation = "source-over"; qc.clearRect(0, 0, W, H); qc.drawImage(pcv, 0, 0); qc.globalCompositeOperation = "multiply"; qc.fillStyle = col; qc.fillRect(0, 0, W, H); ctx.drawImage(qcv, dx, 0); };
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H); ctx.globalCompositeOperation = "lighter";
+      ch("#ff0000", -d); ch("#00ff00", 0); ch("#0000ff", d);
+      ctx.globalCompositeOperation = "source-over";
+    };
+    const noise = (v) => {
+      if (!noiseCv) { noiseCv = document.createElement("canvas"); noiseCv.width = noiseCv.height = 256; const nc = noiseCv.getContext("2d"), id = nc.createImageData(256, 256); for (let i = 0; i < id.data.length; i += 4) { const g = Math.random() * 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = g; id.data[i + 3] = 255; } nc.putImageData(id, 0, 0); }
+      ctx.save(); ctx.globalAlpha = clamp(v * 0.35, 0, 0.6); ctx.globalCompositeOperation = "overlay";
+      const pat = ctx.createPattern(noiseCv, "repeat"); ctx.translate(Math.random() * 256, Math.random() * 256); ctx.fillStyle = pat; ctx.fillRect(-256, -256, W + 512, H + 512); ctx.restore();
+    };
+    const scan = (v) => { ctx.save(); ctx.globalAlpha = clamp(v * 0.28, 0, 0.5); ctx.fillStyle = "#000"; const st = Math.max(2, Math.round(H / 220)); for (let y = 0; y < H; y += st * 2) ctx.fillRect(0, y, W, st); ctx.restore(); };
+    for (const k of canvasFx) {
+      const v = act[k].v, pr = act[k].props || {};
+      if (k === "wave") wave(v, 0.012, 14, 3);
+      else if (k === "aberr") aberr(v);
+      else if (k === "noise") noise(v);
+      else if (k === "pixel") { const f = 3 + v * 14; qc.setTransform(1, 0, 0, 1, 0, 0); qc.clearRect(0, 0, W, H); qc.imageSmoothingEnabled = true; grab(); qc.drawImage(pcv, 0, 0, W / f, H / f); ctx.clearRect(0, 0, W, H); ctx.imageSmoothingEnabled = false; ctx.drawImage(qcv, 0, 0, W / f, H / f, 0, 0, W, H); ctx.imageSmoothingEnabled = true; }
+      else if (k === "vhs") { wave(v, 0.004, 40, 9); aberr(v * 0.5); noise(v * 0.8); scan(v); }
+      else if (k === "glitch") {
+        grab(); const seed = Math.floor(t * 14);
+        for (let i = 0; i < 6; i++) { const y = Math.floor(rnd(seed * 7 + i) * H), h = Math.floor((0.02 + rnd(seed * 13 + i) * 0.08) * H), dx = (rnd(seed * 3 + i) - 0.5) * 0.18 * W * v; ctx.clearRect(0, y, W, h); ctx.drawImage(pcv, 0, y, W, h, dx, y, W, h); }
+      } else if (k === "barsH" || k === "barsV") {
+        const size = clamp(Number(pr.filter_Size ?? 25), 0, 100) / 100 * v * 0.5; ctx.fillStyle = "#000";
+        if (k === "barsH") { ctx.fillRect(0, 0, W, H * size); ctx.fillRect(0, H * (1 - size), W, H * size); } else { ctx.fillRect(0, 0, W * size, H); ctx.fillRect(W * (1 - size), 0, W * size, H); }
+      }
+    }
   }
 
   function render() {
@@ -808,14 +1003,7 @@
       ctx.restore();
     }
 
-    // 필터
-    const kf = lastLE(L.filtEv, T, (f) => f.t);
-    let fcss = "";
-    if (kf >= 0) {
-      const st = L.filtStates[kf];
-      fcss = Object.keys(st).filter((k) => FILTER_CSS[k]).map((k) => FILTER_CSS[k](st[k])).join(" ");
-    }
-    if (fcss !== lastFilter) { cv.style.filter = fcss || "none"; lastFilter = fcss; }
+    postProcess(T, W, H);
 
     // 히트음
     if (ps.i !== lastIdx) {
@@ -842,7 +1030,7 @@
   const fmt = (s) => { const neg = s < 0; s = Math.abs(s); const m = Math.floor(s / 60), r = s - m * 60; return (neg ? "-" : "") + m + ":" + r.toFixed(2).padStart(5, "0"); };
   function say(t, bad) { el.msg.textContent = t || ""; el.msg.className = "pmsg" + (bad ? " bad" : ""); }
 
-  function audioPos() { return T - offsetMs / 1000; }
+  function audioPos() { return T + offsetMs / 1000; }
   function syncAudio() {
     if (!audio) return;
     audio.playbackRate = clamp(pitch * rate, 0.0625, 16);
